@@ -3,9 +3,6 @@
 
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
 #include "VulkUtil.h"
 
 #include <iostream>
@@ -242,6 +239,7 @@ private:
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
         glfwSetWindowUserPointer(window, this);
         glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+        glfwSetKeyCallback(window, dispatchKeyCallback);
     }
 
     static void framebufferResizeCallback(GLFWwindow* window, int /*width*/, int /*height*/) {
@@ -1054,6 +1052,18 @@ private:
             func(instance, debugMessenger, pAllocator);
         }
     }
+
+    static void dispatchKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+        // Retrieve the user pointer and use it to call the member function
+        Vulk* self = static_cast<Vulk*>(glfwGetWindowUserPointer(window));
+        self->keyCallback(key, scancode, action, mods);
+    }
+
+    void keyCallback(int key, int /*scancode*/, int action, int /*mods*/) {
+        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+        }
+    }    
 };
 
 #endif // VULK_INCLUDE_H
