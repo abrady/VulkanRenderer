@@ -9,7 +9,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-
 # Set a variable for the base path
 set(VULKAN_UTILS "c:\\Vulkan")
 # Use the variable in the include_directories command
@@ -145,8 +144,13 @@ add_custom_target(
 link_directories("$ENV{VK_SDK_PATH}\\Lib")
 link_directories("C:\\Vulkan\\glfw\\build\\src\\Debug")
 
-# add_executable (vulkan5 "vulkan5.cpp" "vulkan5.h" "Vulkan.h")
-add_executable (VulkanRenderer "Source/main.cpp")
+add_executable (VulkanRenderer "Source/main.cpp" "Source/Vulk/Vulk.cpp" "Source/Vulk/VulkUtil.cpp")
+if(MSVC)
+  target_compile_options(VulkanRenderer PRIVATE /W4 /WX)
+else()
+  target_compile_options(VulkanRenderer PRIVATE -Wall -Wextra -pedantic -Werror)
+endif()
+
 add_dependencies(VulkanRenderer compile_shaders)
 add_dependencies(VulkanRenderer compile_models)
 add_dependencies(VulkanRenderer compile_textures)

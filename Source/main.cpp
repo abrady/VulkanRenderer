@@ -1,10 +1,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "Vulk.h"
+#include "Samples/VikingRoom.h"
 
 int main () {
-    Vulk vulk;
+    VikingRoom vulk;
     vulk.run();
     return 0;
 }

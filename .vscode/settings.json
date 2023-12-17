@@ -1,0 +1,19 @@
+{
+    "files.associations": {
+        "*.frag": "hlsl",
+        "*.vert": "hlsl",
+        "stdexcept": "cpp",
+        "array": "cpp",
+        "iterator": "cpp",
+        "list": "cpp",
+        "vector": "cpp",
+        "xhash": "cpp",
+        "xtree": "cpp",
+        "format": "cpp",
+        "initializer_list": "cpp",
+        "utility": "cpp",
+        "xstring": "cpp",
+        "xutility": "cpp",
+        "optional": "cpp"
+    }
+}
