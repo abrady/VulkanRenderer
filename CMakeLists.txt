@@ -97,7 +97,7 @@ add_custom_target(
 ##############################################################################
 
 # Set the source and destination directories
-set(SHADER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/Assets/Shaders")
+set(SHADER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/Source/Shaders")
 set(SHADER_DEST_DIR "${TARGET_DIR}/Assets/Shaders") 
 
 # Create the destination directory if it doesn't exist
@@ -144,7 +144,7 @@ add_custom_target(
 link_directories("$ENV{VK_SDK_PATH}\\Lib")
 link_directories("C:\\Vulkan\\glfw\\build\\src\\Debug")
 
-add_executable (VulkanRenderer "Source/main.cpp" "Source/Vulk/Vulk.cpp" "Source/Vulk/VulkUtil.cpp")
+add_executable (VulkanRenderer "Source/main.cpp" "Source/Vulk/Vulk.cpp" "Source/Vulk/VulkGeo.cpp" "Source/Vulk/VulkUtil.cpp")
 if(MSVC)
   target_compile_options(VulkanRenderer PRIVATE /W4 /WX)
 else()
