@@ -294,30 +294,7 @@ private:
         vkDestroySwapchainKHR(device, swapChain, nullptr);
     }
 
-    void cleanupVulkan() {
-        cleanupSwapChain();
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-            vkDestroyFence(device, inFlightFences[i], nullptr);
-        }
-
-        vkDestroyCommandPool(device, commandPool, nullptr);
-
-        vkDestroyDevice(device, nullptr);
-
-        if (enableValidationLayers) {
-            DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-        }
-
-        vkDestroySurfaceKHR(instance, surface, nullptr);
-        vkDestroyInstance(instance, nullptr);
-
-        glfwDestroyWindow(window);
-
-        glfwTerminate();
-    }
+    void cleanupVulkan();
 
     void recreateSwapChain() {
         int width = 0, height = 0;
@@ -1032,6 +1009,9 @@ private:
             severity = "UNKNOWN: ";
         }
         std::cerr << "Vulk: " << severity << std::hex << messageType << " message: " << pCallbackData->pMessage << std::endl;
+        if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+            throw std::runtime_error("validation layer error");
+        }
 
         return VK_FALSE;
     }
