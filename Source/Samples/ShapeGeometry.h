@@ -27,7 +27,8 @@ public:
     void init() override {
         createDescriptorSetLayout();
         createGraphicsPipeline();
-        makeQuad(1.0f, 1.0f, mesh);
+        //makeQuad(1.0f, 1.0f, mesh);
+        makeCylinder(1.0f, 1.0f, 2.0f, 10, 40, mesh);
         mesh.createRender(*this, "Assets/Textures/uv_checker.png");
         createUniformBuffers();
         createDescriptorPool();

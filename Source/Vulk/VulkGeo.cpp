@@ -39,31 +39,14 @@ void makeQuad(float w, float h, VulkMesh &meshData) {
     makeQuad(-w / 2.0f, -h / 2.0f, w, h, 0.0f, meshData);
 }
 
-void makeCap(uint32_t numSlices, float y, float r, float dTheta, VulkMesh &meshData) {
-    uint32_t baseIndex = (uint32_t)meshData.vertices.size();
-    for(uint32_t i = 0; i <= numSlices; ++i) {
-        Vertex vertex;
-        float c = cosf(i * dTheta);
-        float s = sinf(i * dTheta);
-        vertex.pos = glm::vec3(r * c, y, r * s);
-        vertex.texCoord = glm::vec2(c, s);
-        vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-        meshData.vertices.push_back(vertex);
-    }
-    for(uint32_t i = 0; i < numSlices; ++i) {
-        meshData.indices.push_back(baseIndex + i);
-        meshData.indices.push_back(baseIndex + i + 1);
-        meshData.indices.push_back(baseIndex + numSlices + 1);
-    }
-}
-
-
+// TODO: I'm not really sure how to texture this properly.
 void makeCylinder(float height, float bottomRadius, float topRadius, uint32_t numStacks, uint32_t numSlices, VulkMesh &meshData) {
+    uint32_t baseIndex;
+
     float stackHeight = height / numStacks;
     float radiusStep = (topRadius - bottomRadius) / numStacks;
     uint32_t ringCount = numStacks + 1;
-
-    uint32_t baseIndex = (uint32_t)meshData.vertices.size();
+    baseIndex = (uint32_t)meshData.vertices.size();
     for(uint32_t i = 0; i < ringCount; ++i) {
         float y = -0.5f * height + i * stackHeight;
         float r = bottomRadius + i * radiusStep;
@@ -90,7 +73,67 @@ void makeCylinder(float height, float bottomRadius, float topRadius, uint32_t nu
         }
     }
 
-    // cap vertices
-    makeCap(numSlices, -0.5f * height, bottomRadius, glm::pi<float>() * 2.0f, meshData);
-    makeCap(numSlices, 0.5f * height, topRadius, glm::pi<float>() * 2.0f, meshData);
+    float const dTheta = 2.0f * glm::pi<float>() / numSlices;
+    uint32_t centerIndex;
+    
+    // // make top
+    baseIndex = (uint32_t)meshData.vertices.size();
+    for(uint32_t i = 0; i <= numSlices; ++i) {
+        Vertex vertex;
+        float c = cosf(i * dTheta);
+        float s = sinf(i * dTheta);
+        float x = topRadius * c;
+        float z = topRadius * s;
+        float u = x / height + 0.5f;
+        float v = z / height + 0.5f;
+        vertex.pos = glm::vec3(x, 0.5f * height, z);
+        vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+        vertex.tangent = glm::vec3(-s, 0.0f, c);
+        vertex.texCoord = glm::vec2(u, v);
+        meshData.vertices.push_back(vertex);
+    }
+    Vertex topCenter;
+    topCenter.pos = glm::vec3(0.0f, 0.5f * height, 0.0f);
+    topCenter.texCoord = glm::vec2(0.5f, 0.5f);
+    topCenter.normal = glm::vec3(0.0f, -1.0f, 0.0f);
+    topCenter.tangent = glm::vec3(1.0f, 0.0f, 0.0f); // no idea on tangent for the topCenter point
+    meshData.vertices.push_back(topCenter);
+    centerIndex = (uint32_t)meshData.vertices.size() - 1;
+
+    for(uint32_t i = 0; i < numSlices; ++i) {
+        meshData.indices.push_back(baseIndex + i + 1);
+        meshData.indices.push_back(baseIndex + i);
+        meshData.indices.push_back(centerIndex);
+    }
+
+    // make bottom
+    baseIndex = (uint32_t)meshData.vertices.size();
+    for(uint32_t i = 0; i <= numSlices; ++i) {
+        Vertex vertex;
+        float c = cosf(i * dTheta);
+        float s = sinf(i * dTheta);
+        float x = bottomRadius * c;
+        float z = bottomRadius * s;
+        float u = x / height + 0.5f;
+        float v = z / height + 0.5f;
+
+        vertex.pos = glm::vec3(x, -0.5f * height, z);
+        vertex.normal = glm::vec3(0.0f, -1.0f, 0.0f);
+        vertex.tangent = glm::vec3(-s, 0.0f, c);
+        vertex.texCoord = glm::vec2(u, v);
+        meshData.vertices.push_back(vertex);
+    }
+    Vertex bottomCenter;
+    bottomCenter.pos = glm::vec3(0.0f, -0.5f * height, 0.0f);
+    bottomCenter.texCoord = glm::vec2(0.5f, 0.5f);
+    bottomCenter.normal = glm::vec3(0.0f, -1.0f, 0.0f);
+    bottomCenter.tangent = glm::vec3(1.0f, 0.0f, 0.0f); // no idea on tangent for the bottomCenter point
+    meshData.vertices.push_back(bottomCenter);
+    centerIndex = (uint32_t)meshData.vertices.size() - 1;
+
+    for(uint32_t i = 0; i < numSlices; ++i) {
+        meshData.indices.push_back(baseIndex + i);
+        meshData.indices.push_back(baseIndex + i + 1);
+        meshData.indices.push_back(centerIndex);
+    }
 }
