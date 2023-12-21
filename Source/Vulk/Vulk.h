@@ -41,6 +41,7 @@ public:
         initVulkan();
         init();
         while (!glfwWindowShouldClose(window)) {
+            handleEvents();
             glfwPollEvents();
             render();
         }
@@ -69,6 +70,10 @@ protected:
     VkRenderPass renderPass;
     VkExtent2D swapChainExtent;
     uint32_t currentFrame = 0;
+    virtual void handleEvents() {
+        // override this to call things like glfwGetKey and glfwGetMouseButton
+    }
+    virtual void keyCallback(int key, int /*scancode*/, int action, int /*mods*/);
 private:
     bool enableValidationLayers = true; 
     GLFWwindow* window;
@@ -180,7 +185,6 @@ private:
     static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
     static void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
     static void dispatchKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-    virtual void keyCallback(int key, int /*scancode*/, int action, int /*mods*/);
 };
 
 #endif // VULK_INCLUDE_H

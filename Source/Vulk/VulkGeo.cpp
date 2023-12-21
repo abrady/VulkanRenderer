@@ -68,6 +68,41 @@ static void subdivideTris(VulkMesh &meshData) {
     }
 }
 
+void makeEquilateralTri(float side, uint32_t numSubdivisions, VulkMesh &meshData) {
+    Vertex v0;
+    v0.pos = glm::vec3(0.0f, 0.0f, 0.0f);
+    v0.normal = glm::vec3(0.0f, 0.0f, 1.0f);
+    v0.texCoord = glm::vec2(0.5f, 0.0f);
+
+    Vertex v1;
+    v1.pos = glm::vec3(side, 0.0f, 0.0f);
+    v1.normal = glm::vec3(0.0f, 0.0f, 1.0f);
+    v1.texCoord = glm::vec2(1.0f, 1.0f);
+
+    Vertex v2;
+    v2.pos = glm::vec3(side / 2.0f, side * sqrtf(3.0f) / 2.0f, 0.0f);
+    v2.normal = glm::vec3(0.0f, 0.0f, 1.0f);
+    v2.texCoord = glm::vec2(0.0f, 1.0f);
+
+    v0.tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+    v1.tangent = glm::normalize(v2.pos - v1.pos);
+    v2.tangent = glm::normalize(v0.pos - v2.pos);
+
+    meshData.vertices.push_back(v0);
+    meshData.vertices.push_back(v1);
+    meshData.vertices.push_back(v2);
+
+    meshData.indices.push_back(0);
+    meshData.indices.push_back(1);
+    meshData.indices.push_back(2);
+
+    assert(numSubdivisions <= 6u);
+    numSubdivisions = glm::min(numSubdivisions, 6u);
+    for(uint32_t i = 0; i < numSubdivisions; ++i) {
+        subdivideTris(meshData);
+    }
+}
+
 void makeQuad(float x, float y, float w, float h, float depth, uint32_t numSubdivisions, VulkMesh &meshData) {
     Vertex v0;
     v0.pos = glm::vec3(x, y, depth);

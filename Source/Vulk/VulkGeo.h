@@ -4,6 +4,8 @@
 
 class VulkMesh;
 
+void makeEquilateralTri(float side, uint32_t numSubdivisions, VulkMesh &meshData);
+
 void makeQuad(float w, float h, uint32_t numSubdivisions, VulkMesh &meshData);
 void makeQuad(float x, float y, float w, float h, float depth, uint32_t numSubdivisions, VulkMesh &meshData);
 
