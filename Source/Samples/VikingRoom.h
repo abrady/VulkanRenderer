@@ -403,8 +403,8 @@ public:
     void init() override {
         const std::string MODEL_PATH = "Assets/Models/viking_room.obj";
         const std::string TEXTURE_PATH = "Assets/Textures/viking_room.png";
-        char const *vert_shader_path = "Assets/Shaders/Vert/model.spv";
-        char const *frag_shader_path = "Assets/Shaders/Frag/model.spv";
+        char const *vert_shader_path = "Assets/Shaders/Vert/viking.spv";
+        char const *frag_shader_path = "Assets/Shaders/Frag/viking.spv";
 
         createDescriptorSetLayout();
         createGraphicsPipeline(vert_shader_path, frag_shader_path);
