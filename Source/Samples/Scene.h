@@ -4,6 +4,10 @@
 #include "Vulk/VulkGeo.h"
 #include "Vulk/VulkActor.h"
 
+// 1. a scene is going to load the meshes that it uses as vertices and indices
+// 2. it will create vertex and index buffers in GPU mem for rendering
+// 3. actors will refer to these meshes and have their own xforms
+// 4. when rendering, the shader will update the passed in vertices based on each actors xform
 class Scene : public Vulk {
     struct UniformBufferObject {
         alignas(16) glm::mat4 model;
@@ -11,7 +15,7 @@ class Scene : public Vulk {
         alignas(16) glm::mat4 proj;
     };
     struct Camera {
-        glm::vec3 eye = glm::vec3(0f, 0f, 2.0f);
+        glm::vec3 eye = glm::vec3(0.f, 0.f, 2.0f);
         float yaw = 180.0f;
         float pitch = 0.0f;
 
@@ -160,7 +164,7 @@ private:
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;
-        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT; // or VK_CULL_MODE_NONE; for no culling
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
 
@@ -485,7 +489,6 @@ private:
             glm::vec3 up = camera.getUpVec();
             bool handled = true;
             if (key == GLFW_KEY_W) {
-                std::cout << "W pressed " << action << "\n";
                 camera.eye += 0.1f * fwd;
             } else if (key == GLFW_KEY_A) {
                 camera.eye -= 0.1f * right;
@@ -498,17 +501,20 @@ private:
             } else if (key == GLFW_KEY_E) {
                 camera.eye += 0.1f * up;
             } else if (key == GLFW_KEY_LEFT) {
-                camera.yaw -= 1.0f;
+                camera.yaw -= 15.0f;
             } else if (key == GLFW_KEY_RIGHT) {
-                camera.yaw += 1.0f;
+                camera.yaw += 15.0f;
             } else if (key == GLFW_KEY_UP) {
-                camera.pitch += 1.0f;
+                camera.pitch += 15.0f;
             } else if (key == GLFW_KEY_DOWN) {
-                camera.pitch -= 1.0f;
+                camera.pitch -= 15.0f;
             } else {
                 handled = false;
             }
             if (handled) {
+                camera.yaw = fmodf(camera.yaw, 360.0f);
+                camera.pitch = fmodf(camera.pitch, 360.0f);
+                std::cout << "eye: " << camera.eye.x << ", " << camera.eye.y << ", " << camera.eye.z << " yaw: " << camera.yaw << " pitch: " << camera.pitch << std::endl;
                 return;
             }
         }
