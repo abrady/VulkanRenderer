@@ -34,9 +34,10 @@ class Scene : public Vulk {
             return getRotMat() * up;
         }
     } camera;
+
+    std::unordered_map<char const *, VulkMeshRef> meshRefs;
+    VulkMesh meshAccumulator;
     std::vector<VulkActor> actors;
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
 
     std::vector<VkBuffer> uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
@@ -63,16 +64,21 @@ public:
         createDescriptorSetLayout();
         createGraphicsPipeline();
 
-
-        actors.resize(2);
-        actors[0].xform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        makeEquilateralTri(1.0f, 0, actors[0].mesh);
         //makeEquilateralTri(0.5f, 0, actors[1].mesh);
         //makeQuad(1.0f, 1.0f, 0, actors[0].mesh);
-        makeQuad(0.75f, .25f, 0, actors[1].mesh);
+        //makeQuad(0.75f, .25f, 0, actors[1].mesh);
         //makeGeoSphere(0.5f, 3, actors[1].mesh);
         // makeCylinder(1.0f, .2f, .2f, 32, 32, actors[0].mesh);
         // makeGeoSphere(1.0f, 3, actors[1].mesh);
+
+        uint32_t numIndices = 0;
+        // makeEquilateralTri(1.0f, 0, meshAccumulator);
+        // makeGeoSphere(1.0f, 3, meshAccumulator);
+        makeQuad(0.75f, .25f, 0, meshAccumulator);
+        //makeCylinder(1.0f, .2f, .2f, 32, 32, meshAccumulator);
+        meshRefs["tri"] = { "tri", numIndices, (uint32_t)meshAccumulator.indices.size() };
+        actors.push_back({ "tri0", this, meshRefs["tri"] });
+        actors[0].xform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
         createVertexBuffer();
         createIndexBuffer();
@@ -317,27 +323,14 @@ private:
     }
 
     void createVertexBuffer() {
-        VkDeviceSize bufferSize = 0;
-
-        for (auto &actor : actors) {
-            bufferSize += sizeof(actor.mesh.vertices[0]) * actor.mesh.vertices.size();
-        }
-        vertices.reserve(bufferSize / sizeof(Vertex));
-        for(auto &actor : actors) {
-            for (auto &vertex : actor.mesh.vertices) {
-                Vertex v = vertex;
-                v.pos = actor.xform * glm::vec4(vertex.pos, 1.0f);
-                vertices.push_back(v);
-            }
-        }
-
+        VkDeviceSize bufferSize = meshAccumulator.vertices.size() * sizeof(meshAccumulator.vertices[0]);
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, vertices.data(), (size_t)bufferSize);
+        memcpy(data, meshAccumulator.vertices.data(), (size_t)bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
@@ -349,25 +342,14 @@ private:
     }
 
     void createIndexBuffer() {
-        VkDeviceSize bufferSize = 0;
-        for (auto &actor : actors) {
-            bufferSize += sizeof(actor.mesh.indices[0]) * actor.mesh.indices.size();
-        }
-        indices.reserve(bufferSize / sizeof(uint32_t));
-        for(auto &actor : actors) {
-            uint32_t startIndex = (uint32_t)indices.size();
-            for (auto &index : actor.mesh.indices) {
-                indices.push_back(startIndex + index);
-            }
-        }
-
+        VkDeviceSize bufferSize = meshAccumulator.indices.size() * sizeof(meshAccumulator.indices[0]);
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, indices.data(), (size_t)bufferSize);
+        memcpy(data, meshAccumulator.indices.data(), (size_t)bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
@@ -447,7 +429,7 @@ private:
 
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshAccumulator.indices.size()), 1, 0, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 
