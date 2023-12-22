@@ -1,6 +1,9 @@
 #include "VulkGeo.h"
 #include "VulkMesh.h"
 
+// TODO: get subdivideTris working with our geo creation functions and maybe we can accumulate the vertices and indices in the meshData
+#define CHECK_MESH_DATA(meshData) assert(meshData.vertices.size() == 0 && meshData.indices.size() == 0)
+
 // Turn a single triangle into 4 triangles by adding 3 new vertices at the midpoints of each edge
 // Original Triangle:
 //      /\
@@ -69,6 +72,8 @@ static void subdivideTris(VulkMesh &meshData) {
 }
 
 void makeEquilateralTri(float side, uint32_t numSubdivisions, VulkMesh &meshData) {
+    CHECK_MESH_DATA(meshData);
+    meshData.name = "EquilateralTriangle";
     Vertex v0;
     v0.pos = glm::vec3(0.0f, 0.0f, 0.0f);
     v0.normal = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -88,13 +93,14 @@ void makeEquilateralTri(float side, uint32_t numSubdivisions, VulkMesh &meshData
     v1.tangent = glm::normalize(v2.pos - v1.pos);
     v2.tangent = glm::normalize(v0.pos - v2.pos);
 
+    uint32_t baseIndex = (uint32_t)meshData.vertices.size();
     meshData.vertices.push_back(v0);
     meshData.vertices.push_back(v1);
     meshData.vertices.push_back(v2);
 
-    meshData.indices.push_back(0);
-    meshData.indices.push_back(1);
-    meshData.indices.push_back(2);
+    meshData.indices.push_back(baseIndex + 0);
+    meshData.indices.push_back(baseIndex + 1);
+    meshData.indices.push_back(baseIndex + 2);
 
     assert(numSubdivisions <= 6u);
     numSubdivisions = glm::min(numSubdivisions, 6u);
@@ -104,6 +110,9 @@ void makeEquilateralTri(float side, uint32_t numSubdivisions, VulkMesh &meshData
 }
 
 void makeQuad(float x, float y, float w, float h, float depth, uint32_t numSubdivisions, VulkMesh &meshData) {
+    CHECK_MESH_DATA(meshData);
+    meshData.name = "Quad";
+
     Vertex v0;
     v0.pos = glm::vec3(x, y, depth);
     v0.normal = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -124,17 +133,18 @@ void makeQuad(float x, float y, float w, float h, float depth, uint32_t numSubdi
     v3.normal = glm::vec3(0.0f, 0.0f, 1.0f);
     v3.texCoord = glm::vec2(0.0f, 1.0f);
 
+    uint32_t baseIndex = (uint32_t)meshData.vertices.size();
     meshData.vertices.push_back(v0);
     meshData.vertices.push_back(v1);
     meshData.vertices.push_back(v2);
     meshData.vertices.push_back(v3);
 
-    meshData.indices.push_back(0);
-    meshData.indices.push_back(1);
-    meshData.indices.push_back(2);
-    meshData.indices.push_back(0);
-    meshData.indices.push_back(2);
-    meshData.indices.push_back(3);
+    meshData.indices.push_back(baseIndex + 0);
+    meshData.indices.push_back(baseIndex + 1);
+    meshData.indices.push_back(baseIndex + 2);
+    meshData.indices.push_back(baseIndex + 0);
+    meshData.indices.push_back(baseIndex + 2);
+    meshData.indices.push_back(baseIndex + 3);
 
     assert(numSubdivisions <= 6u);
     numSubdivisions = glm::min(numSubdivisions, 6u);
@@ -149,6 +159,9 @@ void makeQuad(float w, float h, uint32_t numSubdivisions, VulkMesh &meshData) {
 
 // TODO: I'm not really sure how to texture this properly.
 void makeCylinder(float height, float bottomRadius, float topRadius, uint32_t numStacks, uint32_t numSlices, VulkMesh &meshData) {
+    CHECK_MESH_DATA(meshData);
+    meshData.name = "Cylinder";
+
     uint32_t baseIndex;
 
     float stackHeight = height / numStacks;
@@ -248,6 +261,9 @@ void makeCylinder(float height, float bottomRadius, float topRadius, uint32_t nu
 
 
 void makeGeoSphere(float radius, uint32_t numSubdivisions, VulkMesh &meshData) {
+    CHECK_MESH_DATA(meshData);
+    meshData.name = "GeoSphere";
+
     // put a cap on the number of subdivisions
     numSubdivisions = glm::min(numSubdivisions, 6u);
 
@@ -272,10 +288,11 @@ void makeGeoSphere(float radius, uint32_t numSubdivisions, VulkMesh &meshData) {
         11, 0, 9, 2, 11, 9, 5, 2, 9, 11, 2, 7
     };
 
-    meshData.vertices.resize(12);
-    meshData.indices.resize(60);
+    uint32_t baseIndex = (uint32_t)meshData.vertices.size();
+    meshData.vertices.resize(meshData.vertices.size() + 12);
+    meshData.indices.resize(meshData.indices.size() + 60);
     for(uint32_t i = 0; i < 60; ++i) {
-        meshData.indices[i] = k[i];
+        meshData.indices[i] = baseIndex + k[i];
     }
 
     for(uint32_t i = 0; i < 12; ++i) {

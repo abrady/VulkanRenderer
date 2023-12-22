@@ -10,6 +10,9 @@ struct VulkMeshRef {
 
 class VulkMesh {
 public:
+    char const *name = nullptr;
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
+
+    VulkMeshRef appendMesh(VulkMesh const &mesh);
 };

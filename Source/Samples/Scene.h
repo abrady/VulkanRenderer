@@ -59,26 +59,23 @@ class Scene : public Vulk {
     VkDeviceMemory textureImageMemory;
     VkImageView textureImageView;
     VkSampler textureSampler;
+
+    void appendMesh(VulkMesh const &mesh) {
+        VulkMeshRef ref = meshAccumulator.appendMesh(mesh);
+        meshRefs[ref.name] = ref;
+    }
 public:
     void init() override {
         createDescriptorSetLayout();
         createGraphicsPipeline();
 
-        //makeEquilateralTri(0.5f, 0, actors[1].mesh);
-        //makeQuad(1.0f, 1.0f, 0, actors[0].mesh);
-        //makeQuad(0.75f, .25f, 0, actors[1].mesh);
-        //makeGeoSphere(0.5f, 3, actors[1].mesh);
-        // makeCylinder(1.0f, .2f, .2f, 32, 32, actors[0].mesh);
-        // makeGeoSphere(1.0f, 3, actors[1].mesh);
-
-        uint32_t numIndices = 0;
-        // makeEquilateralTri(1.0f, 0, meshAccumulator);
-        // makeGeoSphere(1.0f, 3, meshAccumulator);
-        makeQuad(0.75f, .25f, 0, meshAccumulator);
-        //makeCylinder(1.0f, .2f, .2f, 32, 32, meshAccumulator);
-        meshRefs["tri"] = { "tri", numIndices, (uint32_t)meshAccumulator.indices.size() };
-        actors.push_back({ "tri0", this, meshRefs["tri"] });
-        actors[0].xform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        VulkMesh quad, cyl, sphere;
+        makeQuad(1.f, .5f, 0, quad);
+        makeCylinder(1.0f, .2f, .2f, 32, 32, cyl);
+        makeGeoSphere(0.4f, 3, sphere);
+        appendMesh(quad);
+        appendMesh(cyl);
+        appendMesh(sphere);
 
         createVertexBuffer();
         createIndexBuffer();

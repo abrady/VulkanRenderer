@@ -15,3 +15,10 @@ For geometry lets hand-make a box, cylinder, sphere
 # Lighting
 
  
+# Log
+
+## 12/22 Got three objects rendering
+![Alt text](Assets/Screenshots/three_objects_rendering.png)
+
+Three geos rendering in one big vertex and index buffer. next I'd like to treat these as models that I load once and render multiple times
+with my actors so I just need to get refs to them and somehow use that when I go to render them in my drawcall
