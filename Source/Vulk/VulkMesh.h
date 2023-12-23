@@ -4,6 +4,7 @@
 
 struct VulkMeshRef {
         char const *name = nullptr;
+        uint32_t firstVertex = 0;
         uint32_t firstIndex = 0;
         uint32_t indexCount = 0;
 };

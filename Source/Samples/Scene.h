@@ -73,10 +73,12 @@ public:
         createDescriptorSetLayoutBinding();
         createGraphicsPipeline();
 
-        VulkMesh quad, cyl, sphere;
+        VulkMesh tri, quad, cyl, sphere;
+        makeEquilateralTri(1.f, 1, tri);
         makeQuad(1.f, .5f, 0, quad);
         makeCylinder(1.0f, .2f, .2f, 32, 32, cyl);
         makeGeoSphere(0.4f, 3, sphere);
+        addMesh(tri, "tri");
         addMesh(quad, "quad");
         addMesh(cyl, "cyl");
         addMesh(sphere,"sphere");
@@ -396,7 +398,7 @@ private:
         static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
+        time = 0.f; // disable rotation
         UniformBufferObject ubo{};
         ubo.world = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         glm::vec3 fwd = camera.getForwardVec();
@@ -470,7 +472,7 @@ private:
 
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
-        vkCmdDrawIndexed(commandBuffer, actors[0].meshRef.indexCount, (uint32_t)actors.size(), actors[0].meshRef.firstIndex, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, actors[0].meshRef.indexCount, (uint32_t)actors.size(), actors[0].meshRef.firstIndex, actors[0].meshRef.firstVertex, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 
