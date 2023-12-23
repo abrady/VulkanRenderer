@@ -4,13 +4,9 @@
 #include "Vulk/VulkGeo.h"
 #include "Vulk/VulkActor.h"
 
-// 1. a scene is going to load the meshes that it uses as vertices and indices
-// 2. it will create vertex and index buffers in GPU mem for rendering
-// 3. actors will refer to these meshes and have their own xforms
-// 4. when rendering, the shader will update the passed in vertices based on each actors xform
 class Scene : public Vulk {
     struct UniformBufferObject {
-        alignas(16) glm::mat4 model;
+        alignas(16) glm::mat4 world;
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
     };
@@ -36,6 +32,14 @@ class Scene : public Vulk {
     } camera;
 
     std::unordered_map<char const *, VulkMeshRef> meshRefs;
+
+    struct ActorInstanceSSBO {
+        glm::mat4 xform;  
+    };
+    std::array<VkBuffer, MAX_FRAMES_IN_FLIGHT> actorInstanceBuffers;
+    std::array<VkDeviceMemory, MAX_FRAMES_IN_FLIGHT> actorInstanceBuffersMemory;
+    std::array<ActorInstanceSSBO*, MAX_FRAMES_IN_FLIGHT> actorInstanceBuffersMapped;
+
     VulkMesh meshAccumulator;
     std::vector<VulkActor> actors;
 
@@ -60,22 +64,25 @@ class Scene : public Vulk {
     VkImageView textureImageView;
     VkSampler textureSampler;
 
-    void appendMesh(VulkMesh const &mesh) {
+    void addMesh(VulkMesh const &mesh, char const *name) {
         VulkMeshRef ref = meshAccumulator.appendMesh(mesh);
-        meshRefs[ref.name] = ref;
+        meshRefs[name] = ref;
     }
 public:
     void init() override {
-        createDescriptorSetLayout();
+        createDescriptorSetLayoutBinding();
         createGraphicsPipeline();
 
         VulkMesh quad, cyl, sphere;
         makeQuad(1.f, .5f, 0, quad);
         makeCylinder(1.0f, .2f, .2f, 32, 32, cyl);
         makeGeoSphere(0.4f, 3, sphere);
-        appendMesh(quad);
-        appendMesh(cyl);
-        appendMesh(sphere);
+        addMesh(quad, "quad");
+        addMesh(cyl, "cyl");
+        addMesh(sphere,"sphere");
+
+        actors.push_back({"quad1", this, meshRefs["quad"], glm::translate(glm::mat4(1.0f), glm::vec3(0.f, .5f, 0.f))});
+        actors.push_back({"quad0", this, meshRefs["quad"], glm::translate(glm::mat4(1.0f), glm::vec3(0.f, -0.1f, 0.f))});
 
         createVertexBuffer();
         createIndexBuffer();
@@ -83,21 +90,20 @@ public:
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
         textureSampler = createTextureSampler();
         createUniformBuffers();
+        createActorInstanceBuffers();
         createDescriptorPool();
         createDescriptorSets();
     }
 
 private:
-    void createDescriptorSetLayout() {
+    void createDescriptorSetLayoutBinding() {
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
-        // in model.vert you'll see layout(binding = 0) uniform UniformBufferObject which correlates with this binding
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorCount = 1;
         uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uboLayoutBinding.pImmutableSamplers = nullptr;
         uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-        // and in model.frag you'll see layout(binding = 1) uniform sampler2D texSampler;
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
         samplerLayoutBinding.binding = 1;
         samplerLayoutBinding.descriptorCount = 1;
@@ -105,7 +111,14 @@ private:
         samplerLayoutBinding.pImmutableSamplers = nullptr;
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+        VkDescriptorSetLayoutBinding actorInstanceLayoutBinding = {};
+        actorInstanceLayoutBinding.binding = 2; 
+        actorInstanceLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // SSBO
+        actorInstanceLayoutBinding.descriptorCount = 1;
+        actorInstanceLayoutBinding.pImmutableSamplers = nullptr; 
+        actorInstanceLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; 
+
+        std::array<VkDescriptorSetLayoutBinding, 3> bindings = { uboLayoutBinding, samplerLayoutBinding, actorInstanceLayoutBinding };
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -117,7 +130,7 @@ private:
     }
 
     void createGraphicsPipeline() {
-        char const *vert_shader_path = "Assets/Shaders/Vert/model.spv";
+        char const *vert_shader_path = "Assets/Shaders/Vert/instance.spv";
         char const *frag_shader_path = "Assets/Shaders/Frag/model.spv";
 
         auto vertShaderCode = readFileIntoMem(vert_shader_path);
@@ -143,8 +156,8 @@ private:
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-        auto bindingDescription = Vertex::getBindingDescription();
-        auto attributeDescriptions = Vertex::getAttributeDescriptions();
+        VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
+        std::array<VkVertexInputAttributeDescription, Vertex::NumBindingLocations> attributeDescriptions = Vertex::getAttributeDescriptions();
 
         vertexInputInfo.vertexBindingDescriptionCount = 1;
         vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
@@ -251,8 +264,15 @@ private:
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-
             vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+        }
+    }
+
+    void createActorInstanceBuffers() {
+        VkDeviceSize bufferSize  = sizeof(ActorInstanceSSBO) * actors.size();
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            createBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, actorInstanceBuffers[i], actorInstanceBuffersMemory[i]);
+            vkMapMemory(device, actorInstanceBuffersMemory[i], 0, bufferSize, 0, (void**)&actorInstanceBuffersMapped[i]);
         }
     }
 
@@ -270,24 +290,29 @@ private:
         }
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = uniformBuffers[i];
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(UniformBufferObject);
+            VkDescriptorBufferInfo uniformBufferInfo{};
+            uniformBufferInfo.buffer = uniformBuffers[i];
+            uniformBufferInfo.offset = 0;
+            uniformBufferInfo.range = sizeof(UniformBufferObject);
+
+            VkDescriptorBufferInfo actorInstanceBufferInfo = {};
+            actorInstanceBufferInfo.buffer = actorInstanceBuffers[i];
+            actorInstanceBufferInfo.offset = 0;
+            actorInstanceBufferInfo.range = sizeof(ActorInstanceSSBO) * actors.size();
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo.imageView = textureImageView;
             imageInfo.sampler = textureSampler;
-            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
+            std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrites[0].dstSet = descriptorSets[i];
             descriptorWrites[0].dstBinding = 0;
             descriptorWrites[0].dstArrayElement = 0;
             descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             descriptorWrites[0].descriptorCount = 1;
-            descriptorWrites[0].pBufferInfo = &bufferInfo;
+            descriptorWrites[0].pBufferInfo = &uniformBufferInfo;
 
             descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrites[1].dstSet = descriptorSets[i];
@@ -297,16 +322,26 @@ private:
             descriptorWrites[1].descriptorCount = 1;
             descriptorWrites[1].pImageInfo = &imageInfo;
 
+            descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[2].dstSet = descriptorSets[i];
+            descriptorWrites[2].dstBinding = 2;
+            descriptorWrites[2].dstArrayElement = 0;
+            descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptorWrites[2].descriptorCount = 1;
+            descriptorWrites[2].pBufferInfo = &actorInstanceBufferInfo;
+
             vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }
     }
 
     void createDescriptorPool() {
-        std::array<VkDescriptorPoolSize, 2> poolSizes{};
+        std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -363,7 +398,7 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.world = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         glm::vec3 fwd = camera.getForwardVec();
         glm::vec3 lookAt = camera.eye + fwd;
         glm::vec3 up = camera.getUpVec();
@@ -376,9 +411,18 @@ private:
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
+    void updateActorInstanceBuffers(uint32_t currentImage) {
+        for (int i = 0; i < actors.size(); i++) {
+            ActorInstanceSSBO ubo{};
+            ubo.xform = actors[i].xform;
+            actorInstanceBuffersMapped[currentImage][i] = ubo;
+        }
+    }
 
     void drawFrame(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer) override {
         updateUniformBuffer(currentFrame);
+        updateActorInstanceBuffers(currentFrame);
+
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -426,7 +470,7 @@ private:
 
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
 
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshAccumulator.indices.size()), 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, actors[0].meshRef.indexCount, (uint32_t)actors.size(), actors[0].meshRef.firstIndex, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -443,6 +487,8 @@ private:
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroyBuffer(device, uniformBuffers[i], nullptr);
             vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+            vkDestroyBuffer(device, actorInstanceBuffers[i], nullptr);
+            vkFreeMemory(device, actorInstanceBuffersMemory[i], nullptr);
         }
 
         vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
