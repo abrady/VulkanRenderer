@@ -44,6 +44,7 @@ foreach(MODEL_FILE ${MODELS})
         OUTPUT "${DEST}"
         COMMAND ${CMAKE_COMMAND} -E copy "${MODEL_FILE}" "${DEST}"
         DEPENDS "${MODEL_FILE}"
+        COMMENT "build models"
     )
     # Add the output file to a list
     list(APPEND COMPILED_MODELS "${DEST}")
@@ -80,6 +81,7 @@ foreach(TEXTURES_FILE ${TEXTURES})
         OUTPUT "${DEST}"
         COMMAND ${CMAKE_COMMAND} -E copy "${TEXTURES_FILE}" "${DEST}"
         DEPENDS "${TEXTURES_FILE}"
+        COMMENT "build textures"
     )
     # Add the output file to a list
     list(APPEND COMPILED_TEXTURES "${DEST}")
@@ -113,6 +115,7 @@ foreach(SHADER ${VERTEX_SHADERS})
         OUTPUT "${SHADER_OUTPUT}"
         COMMAND glslc "${SHADER}" -o "${SHADER_OUTPUT}"
         DEPENDS ${SHADER}
+        COMMENT "build vertex shaders"
     )
     list(APPEND COMPILED_SHADERS "${SHADER_OUTPUT}")
 endforeach()
@@ -126,6 +129,7 @@ foreach(SHADER ${FRAGMENT_SHADERS})
         OUTPUT "${SHADER_OUTPUT}"
         COMMAND glslc "${SHADER}" -o "${SHADER_OUTPUT}"
         DEPENDS ${SHADER}
+        COMMENT "build fragment shaders"
     )
     list(APPEND COMPILED_SHADERS "${SHADER_OUTPUT}")
 endforeach()
