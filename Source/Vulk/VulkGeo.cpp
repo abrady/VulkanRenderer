@@ -33,13 +33,10 @@ static void subdivideTris(VulkMesh &meshData) {
         // generate 3 new vertices at the midpoints of each edge
         Vertex m0, m1, m2;
         m0.pos = 0.5f * (v0.pos + v1.pos);
-        m0.color = 0.5f * (v0.color + v1.color);
         m0.texCoord = 0.5f * (v0.texCoord + v1.texCoord);
         m1.pos = 0.5f * (v1.pos + v2.pos);
-        m1.color = 0.5f * (v1.color + v2.color);
         m1.texCoord = 0.5f * (v1.texCoord + v2.texCoord);
         m2.pos = 0.5f * (v0.pos + v2.pos);
-        m2.color = 0.5f * (v0.color + v2.color);   
         m2.texCoord = 0.5f * (v0.texCoord + v2.texCoord);
 
 

@@ -248,7 +248,7 @@ private:
 
     void createGraphicsPipeline() {
         char const *vert_shader_path = "Assets/Shaders/Vert/instance.spv";
-        char const *frag_shader_path = "Assets/Shaders/Frag/model.spv";
+        char const *frag_shader_path = "Assets/Shaders/Frag/instance.spv";
 
         auto vertShaderCode = readFileIntoMem(vert_shader_path);
         auto fragShaderCode = readFileIntoMem(frag_shader_path);
@@ -372,6 +372,8 @@ private:
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
+    // each mesh has its own descriptor set and we need to allocate
+    // a descriptor for each item in the set. 
     void createDescriptorPool(uint32_t numMeshes) {
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -432,7 +434,6 @@ private:
         static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-        time = 0.f; // disable rotation
         ubo.world = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         glm::vec3 fwd = camera.getForwardVec();
         glm::vec3 lookAt = camera.eye + fwd;

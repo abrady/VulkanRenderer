@@ -914,7 +914,9 @@ VKAPI_ATTR VkBool32 VKAPI_CALL Vulk::debugCallback(VkDebugUtilsMessageSeverityFl
         severity = "UNKNOWN: ";
     }
     std::cerr << "Vulk: " << severity << std::hex << messageType << " message: " << pCallbackData->pMessage << std::endl;
-    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+    if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) 
+        // super annoying: I used vulkan configurator to see if it did anything useful and now I can't figure out how to turn this off.
+        && 0 != strcmp(pCallbackData->pMessage, "loader_get_json: Failed to open JSON file C:\\Program Files\\IntelSWTools\\GPA\\\\Streams\\VkLayer_state_tracker.json")) {
         throw std::runtime_error("validation layer error");
     }
 

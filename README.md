@@ -21,10 +21,24 @@ For geometry lets hand-make a box, cylinder, sphere
  
 # Log
 
+## 12/24 would you please start making a scene
+* make a scene: 
+    * I'd like the axes to be rendered properly
+    * let's make a floor
+    * draw some cylinders and spheres.
+* we only have one texture at the moment (uv checker) might be nice to draw different ones
+* I just realized the vertex color isn't used at all, I should remove that - DONE
+
+
+Notes:
+![Alt text](Assets/Screenshots/renderdoc_basic.png)
+* little sidetrip with renderdoc - I was just curious to see what this looks like and was not disappointed. I do wish I could see inside the descriptorsets, it looks like this is included in the api.
+
 ## 12/23 Instancing continued
+![Alt text](Assets/Screenshots/per_model_descriptor_set_and_ssbo.png)
 
 Plan:
-* Now that we support multiple instances of a single mesh, I need to add support for multiple meshes and drawing all the instances for each mesh.
+* Now that we support multiple instances of a single mesh, I need to add support for multiple meshes and drawing all the instances for each mesh. - DONE
     * Reminder of how things work currently:
         * we stick all of our meshes and all of our indices into a big buffer
         * we have a list of actors in the Scene 
@@ -48,9 +62,10 @@ Plan:
 
 
 Notes:
-* let's add the axes so I can confirm the orientation of things.
-* hmm, only the first instance model is running properly, what'd I do wrong...ah, auto& not auto
-* out of pool memory now that I added a second mesh to render...just allocate more per actor
+* x let's add the axes so I can confirm the orientation of things.
+* x hmm, only the first instance model is running properly, what'd I do wrong...ah, auto& not auto
+* x out of pool memory now that I added a second mesh to render...just allocate more per actor...
+    * just forgot to include the maxSets when I upped the pool sizes.  
 
 ## 12/22 Instancing
 
