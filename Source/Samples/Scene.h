@@ -31,24 +31,68 @@ class Scene : public Vulk {
         }
     } camera;
 
-    std::unordered_map<char const *, VulkMeshRef> meshRefs;
-
-    struct ActorInstanceSSBO {
+    struct ActorSSBOElt {
         glm::mat4 xform;  
     };
-    std::array<VkBuffer, MAX_FRAMES_IN_FLIGHT> actorInstanceBuffers;
-    std::array<VkDeviceMemory, MAX_FRAMES_IN_FLIGHT> actorInstanceBuffersMemory;
-    std::array<ActorInstanceSSBO*, MAX_FRAMES_IN_FLIGHT> actorInstanceBuffersMapped;
 
-    VulkMesh meshAccumulator;
-    std::vector<VulkActor> actors;
+    struct ActorSSBO {
+        VkBuffer buf;
+        VkDeviceMemory mem;
+        ActorSSBOElt* mappedActorElts; // contiguous array of memory mapped actor instance info
 
-    std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
-    std::vector<void*> uniformBuffersMapped;
+        void createAndMap(Vulk &vk, uint32_t numActors) {
+            VkDeviceSize bufferSize = sizeof(ActorSSBOElt) * numActors;
+            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buf, mem);
+            vkMapMemory(vk.device, mem, 0, bufferSize, 0, (void**)&mappedActorElts);
+        }
+        void cleanup(VkDevice dev) {
+            vkDestroyBuffer(dev, buf, nullptr);
+            vkFreeMemory(dev, mem, nullptr);
+        }
+    };
+
+    struct MeshFrameResources {
+        VkDescriptorSet descriptorSet;
+        ActorSSBO buf;
+
+        void cleanup(VkDevice dev) {
+            buf.cleanup(dev);
+        }
+    };
 
     VkDescriptorPool descriptorPool;
-    std::vector<VkDescriptorSet> descriptorSets;
+
+    struct MeshRenderInfo {
+        VulkMeshRef meshRef; // what we're drawing
+        std::vector<VulkActor> actors; // the actors that use this mesh
+        std::array<MeshFrameResources, MAX_FRAMES_IN_FLIGHT> meshRenderData; // the per-frame data
+        void updateActorSSBO(uint32_t curFrame) {
+            MeshFrameResources &res = meshRenderData[curFrame];
+            for (int i = 0; i < actors.size(); i++) {
+                ActorSSBOElt ubo{};
+                ubo.xform = actors[i].xform;
+                res.buf.mappedActorElts[i] = ubo;
+            }
+        }
+        void cleanup(VkDevice dev) {
+            for (auto &res : meshRenderData) {
+                res.cleanup(dev);
+            }
+        }
+    };
+    std::unordered_map<char const *, MeshRenderInfo> meshActors;
+
+    struct UBO {
+        VkBuffer buf;
+        VkDeviceMemory mem;
+        UniformBufferObject* mappedUBO;
+        void createUniformBuffers(Vulk &vk) {
+            VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buf, mem);
+            vkMapMemory(vk.device, mem, 0, bufferSize, 0, (void**)&mappedUBO);
+        }
+    };
+    std::array<UBO, MAX_FRAMES_IN_FLIGHT> ubos;
 
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
@@ -57,6 +101,7 @@ class Scene : public Vulk {
     VkBuffer vertexBuffer;
     VkBuffer indexBuffer;
 
+    VulkMesh meshAccumulator;
     VkDeviceMemory vertexBufferMemory;
     VkDeviceMemory indexBufferMemory;
     VkImage textureImage;
@@ -64,10 +109,6 @@ class Scene : public Vulk {
     VkImageView textureImageView;
     VkSampler textureSampler;
 
-    void addMesh(VulkMesh const &mesh, char const *name) {
-        VulkMeshRef ref = meshAccumulator.appendMesh(mesh);
-        meshRefs[name] = ref;
-    }
 public:
     void init() override {
         createDescriptorSetLayoutBinding();
@@ -78,23 +119,92 @@ public:
         makeQuad(1.f, .5f, 0, quad);
         makeCylinder(1.0f, .2f, .2f, 32, 32, cyl);
         makeGeoSphere(0.4f, 3, sphere);
-        addMesh(tri, "tri");
-        addMesh(quad, "quad");
-        addMesh(cyl, "cyl");
-        addMesh(sphere,"sphere");
+        VulkMeshRef triRef = meshAccumulator.appendMesh(tri);
+        VulkMeshRef quadRef = meshAccumulator.appendMesh(quad);
+        VulkMeshRef cylRef = meshAccumulator.appendMesh(cyl);
+        VulkMeshRef sphereRef = meshAccumulator.appendMesh(sphere);
 
-        actors.push_back({"quad1", this, meshRefs["quad"], glm::translate(glm::mat4(1.0f), glm::vec3(0.f, .5f, 0.f))});
-        actors.push_back({"quad0", this, meshRefs["quad"], glm::translate(glm::mat4(1.0f), glm::vec3(0.f, -0.1f, 0.f))});
+        std::vector<VulkActor> quadActors;
+        quadActors.push_back({"quad1", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, .5f, 0.f))});
+        quadActors.push_back({"quad0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, -0.1f, 0.f))});
+        meshActors["quad"] = {
+            quadRef,
+            quadActors,
+        };
 
         createVertexBuffer();
         createIndexBuffer();
         createTextureImage("Assets/Textures/uv_checker.png", textureImageMemory, textureImage);
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
         textureSampler = createTextureSampler();
-        createUniformBuffers();
-        createActorInstanceBuffers();
+        for (auto &ubo: ubos) {
+            ubo.createUniformBuffers(*this);
+        }
         createDescriptorPool();
-        createDescriptorSets();
+
+        for (auto &meshActor : meshActors) {
+            auto &meshRenderInfo = meshActor.second;
+            uint32_t numActors = static_cast<uint32_t>(meshRenderInfo.actors.size());
+            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                MeshFrameResources &res = meshRenderInfo.meshRenderData[i];
+                // map the actor xforms into a mem-mapped SSBO
+                res.buf.createAndMap(*this, numActors);
+                
+                // create the descriptor set
+                VkDescriptorSetAllocateInfo allocInfo{};
+                allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+                allocInfo.descriptorPool = descriptorPool;
+                allocInfo.descriptorSetCount = 1;
+                allocInfo.pSetLayouts = &descriptorSetLayout;
+
+                if (vkAllocateDescriptorSets(device, &allocInfo, &res.descriptorSet) != VK_SUCCESS) {
+                    throw std::runtime_error("failed to allocate descriptor sets!");
+                }
+
+                VkDescriptorBufferInfo uniformBufferInfo{};
+                uniformBufferInfo.buffer = ubos[i].buf;
+                uniformBufferInfo.offset = 0;
+                uniformBufferInfo.range = sizeof(UniformBufferObject);
+
+                VkDescriptorBufferInfo actorInstanceBufferInfo = {};
+                actorInstanceBufferInfo.buffer = res.buf.buf;
+                actorInstanceBufferInfo.offset = 0;
+                actorInstanceBufferInfo.range = sizeof(ActorSSBOElt) * numActors;
+
+                VkDescriptorImageInfo imageInfo{};
+                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfo.imageView = textureImageView;
+                imageInfo.sampler = textureSampler;
+
+                std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
+                descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                descriptorWrites[0].dstSet = res.descriptorSet;
+                descriptorWrites[0].dstBinding = 0;
+                descriptorWrites[0].dstArrayElement = 0;
+                descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                descriptorWrites[0].descriptorCount = 1;
+                descriptorWrites[0].pBufferInfo = &uniformBufferInfo;
+
+                descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                descriptorWrites[1].dstSet = res.descriptorSet;
+                descriptorWrites[1].dstBinding = 1;
+                descriptorWrites[1].dstArrayElement = 0;
+                descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                descriptorWrites[1].descriptorCount = 1;
+                descriptorWrites[1].pImageInfo = &imageInfo;
+
+                descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                descriptorWrites[2].dstSet = res.descriptorSet;
+                descriptorWrites[2].dstBinding = 2;
+                descriptorWrites[2].dstArrayElement = 0;
+                descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                descriptorWrites[2].descriptorCount = 1;
+                descriptorWrites[2].pBufferInfo = &actorInstanceBufferInfo;
+
+                vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+            }
+        }
+        
     }
 
 private:
@@ -257,85 +367,6 @@ private:
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
-    void createUniformBuffers() {
-        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-
-        uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-        uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-        uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-            vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
-        }
-    }
-
-    void createActorInstanceBuffers() {
-        VkDeviceSize bufferSize  = sizeof(ActorInstanceSSBO) * actors.size();
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            createBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, actorInstanceBuffers[i], actorInstanceBuffersMemory[i]);
-            vkMapMemory(device, actorInstanceBuffersMemory[i], 0, bufferSize, 0, (void**)&actorInstanceBuffersMapped[i]);
-        }
-    }
-
-    void createDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
-        VkDescriptorSetAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool;
-        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-        allocInfo.pSetLayouts = layouts.data();
-
-        descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate descriptor sets!");
-        }
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            VkDescriptorBufferInfo uniformBufferInfo{};
-            uniformBufferInfo.buffer = uniformBuffers[i];
-            uniformBufferInfo.offset = 0;
-            uniformBufferInfo.range = sizeof(UniformBufferObject);
-
-            VkDescriptorBufferInfo actorInstanceBufferInfo = {};
-            actorInstanceBufferInfo.buffer = actorInstanceBuffers[i];
-            actorInstanceBufferInfo.offset = 0;
-            actorInstanceBufferInfo.range = sizeof(ActorInstanceSSBO) * actors.size();
-
-            VkDescriptorImageInfo imageInfo{};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = textureImageView;
-            imageInfo.sampler = textureSampler;
-
-            std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
-            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[0].dstSet = descriptorSets[i];
-            descriptorWrites[0].dstBinding = 0;
-            descriptorWrites[0].dstArrayElement = 0;
-            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            descriptorWrites[0].descriptorCount = 1;
-            descriptorWrites[0].pBufferInfo = &uniformBufferInfo;
-
-            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[1].dstSet = descriptorSets[i];
-            descriptorWrites[1].dstBinding = 1;
-            descriptorWrites[1].dstArrayElement = 0;
-            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptorWrites[1].descriptorCount = 1;
-            descriptorWrites[1].pImageInfo = &imageInfo;
-
-            descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[2].dstSet = descriptorSets[i];
-            descriptorWrites[2].dstBinding = 2;
-            descriptorWrites[2].dstArrayElement = 0;
-            descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            descriptorWrites[2].descriptorCount = 1;
-            descriptorWrites[2].pBufferInfo = &actorInstanceBufferInfo;
-
-            vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-        }
-    }
-
     void createDescriptorPool() {
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -394,36 +425,25 @@ private:
         vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
-    void updateUniformBuffer(uint32_t currentImage) {
+    void updateUniformBuffer(UniformBufferObject &ubo) {
         static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
         time = 0.f; // disable rotation
-        UniformBufferObject ubo{};
         ubo.world = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         glm::vec3 fwd = camera.getForwardVec();
         glm::vec3 lookAt = camera.eye + fwd;
         glm::vec3 up = camera.getUpVec();
-        auto lokkat = glm::lookAt(camera.eye, lookAt, up);
-        ubo.view = lokkat;
-        // ubo.view = glm::lookAt(glm::vec3(0.f, 0.f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.f));
+        ubo.view = glm::lookAt(camera.eye, lookAt, up);
         ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
-
-        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
-    }
-
-    void updateActorInstanceBuffers(uint32_t currentImage) {
-        for (int i = 0; i < actors.size(); i++) {
-            ActorInstanceSSBO ubo{};
-            ubo.xform = actors[i].xform;
-            actorInstanceBuffersMapped[currentImage][i] = ubo;
-        }
     }
 
     void drawFrame(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer) override {
-        updateUniformBuffer(currentFrame);
-        updateActorInstanceBuffers(currentFrame);
+        updateUniformBuffer(*ubos[currentFrame].mappedUBO);
+        for (auto &meshActor : meshActors) {
+           meshActor.second.updateActorSSBO(currentFrame);
+        }
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -470,9 +490,12 @@ private:
 
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
-
-        vkCmdDrawIndexed(commandBuffer, actors[0].meshRef.indexCount, (uint32_t)actors.size(), actors[0].meshRef.firstIndex, actors[0].meshRef.firstVertex, 0);
+        for (auto &meshActor: meshActors) {
+            MeshRenderInfo &meshRenderInfo = meshActor.second;
+            MeshFrameResources &res = meshRenderInfo.meshRenderData[currentFrame];
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &res.descriptorSet, 0, nullptr);
+            vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
+        }
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -486,11 +509,13 @@ private:
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
 
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-            vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-            vkDestroyBuffer(device, actorInstanceBuffers[i], nullptr);
-            vkFreeMemory(device, actorInstanceBuffersMemory[i], nullptr);
+        for (auto ubo: ubos) {
+            vkDestroyBuffer(device, ubo.buf, nullptr);
+            vkFreeMemory(device, ubo.mem, nullptr);
+        }
+
+        for (auto &meshActor : meshActors) {
+            meshActor.second.cleanup(device);
         }
 
         vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);

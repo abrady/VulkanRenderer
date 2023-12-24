@@ -22,12 +22,41 @@ For geometry lets hand-make a box, cylinder, sphere
 # Log
 
 ## 12/23 Instancing continued
-* I might take a little segue and try the vertex offset in vkDrawIndexed because I might as well do that now.
+
+Plan:
+* Now that we support multiple instances of a single mesh, I need to add support for multiple meshes and drawing all the instances for each mesh.
+    * Reminder of how things work currently:
+        * we stick all of our meshes and all of our indices into a big buffer
+        * we have a list of actors in the Scene 
+        * we create a contiguous set of SSBO buffers which we write the instance xforms to
+        * in the descriptor set layout we specify that we're using an SSBO at binding 2
+        * We create an SSBO for all the actors which we mmap
+        * We add these to the per-frame descriptor set
+        * we render the set of indices N times where N is the number of instanced actors.
+    * what we need:
+        * we can still stick all the meshes and indices into big buffers
+        * we need the actors per mesh type
+        * we need a set of per-mesh-type SSBOs
+        * descriptor set layout can stay the same
+        * but we need a per-mesh descriptor set
+        * with rendering, for each mesh type:
+            * update the transformations for this mesh
+            * we bind the descriptor set for this mesh
+            * and render the instances for this mesh
+* I might take a little segue and try the vertex offset in vkDrawIndexed because why not use what the API provides - DONE
 * then I need to try to actually make a relatively interesting scene
 
 
+Notes:
+* hmm, only the first instance model is running properly, what'd I do wrong...
+
 ## 12/22 Instancing
+
 ![Two Instances](Assets/Screenshots/two_quad_instances.png)
+
+Here's a diagram describing what we did:
+![Alt text](Assets/Screenshots/single_mesh_instance_diagram.png)
+
 Learnings:
 * SSBOs or Shader Storage Buffer Objects are a way of passing data into a shader distinct from Uniforms (and also vertex data), I'm using it to pass in the transforms because they support dynamic sizing on the shader side. They're different than uniforms in the following ways:
    * can be much larger than UBOs (but this is device specific how much)
