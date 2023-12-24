@@ -13,3 +13,4 @@ void makeQuad(float x, float y, float w, float h, float depth, uint32_t numSubdi
 // vertices and indices are output parameters that are appended to
 void makeCylinder(float height, float bottomRadius, float topRadius, uint32_t numStacks, uint32_t numSlices, VulkMesh &meshData);
 void makeGeoSphere(float radius, uint32_t numSubdivisions, VulkMesh &meshData);
+void makeAxes(float length, VulkMesh &meshData);

@@ -114,15 +114,17 @@ public:
         createDescriptorSetLayoutBinding();
         createGraphicsPipeline();
 
-        VulkMesh tri, quad, cyl, sphere;
+        VulkMesh tri, quad, cyl, sphere, axes;
         makeEquilateralTri(1.f, 1, tri);
         makeQuad(1.f, .5f, 0, quad);
         makeCylinder(1.0f, .2f, .2f, 32, 32, cyl);
         makeGeoSphere(0.4f, 3, sphere);
+        makeAxes(1.0f, axes);
         VulkMeshRef triRef = meshAccumulator.appendMesh(tri);
         VulkMeshRef quadRef = meshAccumulator.appendMesh(quad);
         VulkMeshRef cylRef = meshAccumulator.appendMesh(cyl);
         VulkMeshRef sphereRef = meshAccumulator.appendMesh(sphere);
+        VulkMeshRef axesRef = meshAccumulator.appendMesh(axes);
 
         std::vector<VulkActor> quadActors;
         quadActors.push_back({"quad1", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, .5f, 0.f))});
@@ -132,6 +134,19 @@ public:
             quadActors,
         };
 
+        std::vector<VulkActor> triActors;
+        triActors.push_back({"tri1", glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, 0.0f, 0.f))});
+        triActors.push_back({"tri0", glm::translate(glm::mat4(1.0f), glm::vec3(-0.1f, 0.0f, 0.f))});
+        meshActors["tri"] = {
+            triRef,
+            triActors,
+        };
+
+        uint32_t totalNumActors = 0;
+        for (auto &meshActor : meshActors) {
+            totalNumActors += static_cast<uint32_t>(meshActor.second.actors.size());
+        }
+
         createVertexBuffer();
         createIndexBuffer();
         createTextureImage("Assets/Textures/uv_checker.png", textureImageMemory, textureImage);
@@ -140,7 +155,7 @@ public:
         for (auto &ubo: ubos) {
             ubo.createUniformBuffers(*this);
         }
-        createDescriptorPool();
+        createDescriptorPool(totalNumActors);
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
@@ -157,9 +172,7 @@ public:
                 allocInfo.descriptorSetCount = 1;
                 allocInfo.pSetLayouts = &descriptorSetLayout;
 
-                if (vkAllocateDescriptorSets(device, &allocInfo, &res.descriptorSet) != VK_SUCCESS) {
-                    throw std::runtime_error("failed to allocate descriptor sets!");
-                }
+                VK_CALL(vkAllocateDescriptorSets(device, &allocInfo, &res.descriptorSet));
 
                 VkDescriptorBufferInfo uniformBufferInfo{};
                 uniformBufferInfo.buffer = ubos[i].buf;
@@ -236,9 +249,7 @@ private:
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor set layout!");
-        }
+        VK_CALL(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout));
     }
 
     void createGraphicsPipeline() {
@@ -367,24 +378,22 @@ private:
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
-    void createDescriptorPool() {
+    void createDescriptorPool(uint32_t numActors) {
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numActors);
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
-        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numActors);
 
-        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor pool!");
-        }
+        VK_CALL(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool));
     }
 
     void createVertexBuffer() {

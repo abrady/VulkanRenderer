@@ -157,7 +157,8 @@ void makeQuad(float w, float h, uint32_t numSubdivisions, VulkMesh &meshData) {
     makeQuad(-w / 2.0f, -h / 2.0f, w, h, 0.0f, numSubdivisions, meshData);
 }
 
-// TODO: I'm not really sure how to texture this properly.
+// make a cylinder of height `height` with radius `radius`, `numStacks` and `numSlices` slices (stacks are vertical, slices are horizontal - think pizza slices)
+// cenetered at the origin
 void makeCylinder(float height, float bottomRadius, float topRadius, uint32_t numStacks, uint32_t numSlices, VulkMesh &meshData) {
     CHECK_MESH_DATA(meshData);
     meshData.name = "Cylinder";
@@ -313,4 +314,22 @@ void makeGeoSphere(float radius, uint32_t numSubdivisions, VulkMesh &meshData) {
         meshData.vertices[i].texCoord.y = asinf(n.y) / glm::pi<float>() + 0.5f;
         meshData.vertices[i].tangent = glm::vec3(1.0f, 0.0f, 0.0f); // TODO: calculate tangent
     }
+}
+
+void makeAxes(float length, VulkMesh &meshData) {
+    CHECK_MESH_DATA(meshData);
+    meshData.name = "Axes";
+    VulkMesh x,y,z;
+    makeCylinder(length, 0.01f, 0.01f, 10, 10, x);
+    makeCylinder(length, 0.01f, 0.01f, 10, 10, y);
+    makeCylinder(length, 0.01f, 0.01f, 10, 10, z);
+
+    glm::mat4 rotX = glm::rotate(glm::mat4(1.0f), glm::pi<float>() / 2.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+    x.xform(rotX);
+    glm::mat4 rotZ = glm::rotate(glm::mat4(1.0f), glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+    z.xform(rotZ);
+
+    meshData.appendMesh(x);
+    meshData.appendMesh(y);
+    meshData.appendMesh(z);
 }

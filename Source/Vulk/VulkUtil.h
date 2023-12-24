@@ -32,6 +32,18 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <cassert>
+#include <vulkan/vk_enum_string_helper.h>
+
+#define VK_CALL(func) \
+do { \
+    VkResult result = (func); \
+    if (result != VK_SUCCESS) { \
+        std::cerr << "Vulkan error: " << string_VkResult(result) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        throw std::runtime_error(std::string("Vulkan error: ") + string_VkResult(result) + " at " + __FILE__ + ":" + std::to_string(__LINE__)); \
+    } \
+} while (0)
+
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;

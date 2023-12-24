@@ -11,3 +11,11 @@ VulkMeshRef VulkMesh::appendMesh(VulkMesh const &mesh) {
     
     return VulkMeshRef{mesh.name, vertexOffset, indexOffset, static_cast<uint32_t>(mesh.indices.size())};
 }
+
+void VulkMesh::xform(glm::mat4 const &xform) {
+    for (Vertex &v : vertices) {
+        v.pos = glm::vec3(xform * glm::vec4(v.pos, 1.0f));
+        v.normal = glm::vec3(xform * glm::vec4(v.normal, 0.0f));
+        v.tangent = glm::vec3(xform * glm::vec4(v.tangent, 0.0f));
+    }
+}

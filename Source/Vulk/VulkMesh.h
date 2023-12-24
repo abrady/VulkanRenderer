@@ -16,4 +16,5 @@ public:
     std::vector<uint32_t> indices;
 
     VulkMeshRef appendMesh(VulkMesh const &mesh);
+    void xform(glm::mat4 const &xform);
 };

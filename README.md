@@ -48,7 +48,8 @@ Plan:
 
 
 Notes:
-* hmm, only the first instance model is running properly, what'd I do wrong...
+* hmm, only the first instance model is running properly, what'd I do wrong...ah, auto& not auto
+* out of pool memory now that I added a second mesh to render...just allocate more per actor
 
 ## 12/22 Instancing
 
