@@ -325,9 +325,11 @@ void makeAxes(float length, VulkMesh &meshData) {
     makeCylinder(length, 0.01f, 0.01f, 10, 10, z);
 
     glm::mat4 rotX = glm::rotate(glm::mat4(1.0f), glm::pi<float>() / 2.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-    x.xform(rotX);
+    glm::mat4 rotAndTranslateX = glm::translate(glm::mat4(1.0f), glm::vec3(length / 2.0f, 0.0f, 0.0f)) * rotX;
+    x.xform(rotAndTranslateX);
     glm::mat4 rotZ = glm::rotate(glm::mat4(1.0f), glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
-    z.xform(rotZ);
+    glm::mat4 rotAndTranslateZ = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, length / 2.0f)) * rotZ;
+    z.xform(rotAndTranslateZ);
 
     meshData.appendMesh(x);
     meshData.appendMesh(y);

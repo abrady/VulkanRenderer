@@ -48,6 +48,7 @@ Plan:
 
 
 Notes:
+* let's add the axes so I can confirm the orientation of things.
 * hmm, only the first instance model is running properly, what'd I do wrong...ah, auto& not auto
 * out of pool memory now that I added a second mesh to render...just allocate more per actor
 

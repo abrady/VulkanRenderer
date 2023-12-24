@@ -134,18 +134,12 @@ public:
             quadActors,
         };
 
-        std::vector<VulkActor> triActors;
-        triActors.push_back({"tri1", glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, 0.0f, 0.f))});
-        triActors.push_back({"tri0", glm::translate(glm::mat4(1.0f), glm::vec3(-0.1f, 0.0f, 0.f))});
-        meshActors["tri"] = {
-            triRef,
-            triActors,
+        std::vector<VulkActor> axisActors;
+        axisActors.push_back({"debugAxes", glm::mat4(1.0f)});
+        meshActors["axes"] = {
+            axesRef,
+            axisActors,
         };
-
-        uint32_t totalNumActors = 0;
-        for (auto &meshActor : meshActors) {
-            totalNumActors += static_cast<uint32_t>(meshActor.second.actors.size());
-        }
 
         createVertexBuffer();
         createIndexBuffer();
@@ -155,7 +149,7 @@ public:
         for (auto &ubo: ubos) {
             ubo.createUniformBuffers(*this);
         }
-        createDescriptorPool(totalNumActors);
+        createDescriptorPool(static_cast<uint32_t>(meshActors.size()));
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
@@ -378,20 +372,20 @@ private:
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
     }
 
-    void createDescriptorPool(uint32_t numActors) {
+    void createDescriptorPool(uint32_t numMeshes) {
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numMeshes);
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numMeshes);
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numActors);
+        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numMeshes);
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
-        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numActors);
+        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numMeshes);
 
         VK_CALL(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool));
     }
