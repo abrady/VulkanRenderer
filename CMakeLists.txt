@@ -115,7 +115,7 @@ foreach(SHADER ${VERTEX_SHADERS})
         OUTPUT "${SHADER_OUTPUT}"
         COMMAND glslc "${SHADER}" -o "${SHADER_OUTPUT}"
         DEPENDS ${SHADER}
-        COMMENT "build vertex shaders"
+        COMMENT "building vertex shader ${SHADER}"
     )
     list(APPEND COMPILED_SHADERS "${SHADER_OUTPUT}")
 endforeach()
@@ -129,7 +129,7 @@ foreach(SHADER ${FRAGMENT_SHADERS})
         OUTPUT "${SHADER_OUTPUT}"
         COMMAND glslc "${SHADER}" -o "${SHADER_OUTPUT}"
         DEPENDS ${SHADER}
-        COMMENT "build fragment shaders"
+        COMMENT "building fragment shader ${SHADER}"
     )
     list(APPEND COMPILED_SHADERS "${SHADER_OUTPUT}")
 endforeach()
