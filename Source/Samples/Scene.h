@@ -3,6 +3,7 @@
 #include "Vulk/Vulk.h"
 #include "Vulk/VulkGeo.h"
 #include "Vulk/VulkActor.h"
+#include "Vulk/VulkCamera.h"
 
 class Scene : public Vulk {
     struct UniformBufferObject {
@@ -10,26 +11,7 @@ class Scene : public Vulk {
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
     };
-    struct Camera {
-        glm::vec3 eye = glm::vec3(0.f, 0.f, 2.0f);
-        float yaw = 180.0f;
-        float pitch = 0.0f;
-
-        glm::mat3 getRotMat() {
-            return glm::eulerAngleXY(glm::radians(pitch), glm::radians(yaw));
-        }        
-        glm::vec3 getForwardVec() {
-            return getRotMat()[2];
-        }
-        glm::vec3 getRightVec() {
-            glm::vec3 right = glm::vec3(1.0f, 0.0f, 0.0f);
-            return getRotMat() * right;
-        }
-        glm::vec3 getUpVec() {
-            glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-            return getRotMat() * up;
-        }
-    } camera;
+    VulkCamera camera;
 
     struct ActorSSBOElt {
         glm::mat4 xform;  
@@ -101,7 +83,17 @@ class Scene : public Vulk {
     VkBuffer vertexBuffer;
     VkBuffer indexBuffer;
 
-    VulkMesh meshAccumulator;
+    struct MeshAccumulator {
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
+        VulkMeshRef appendMesh(VulkMesh const &mesh) {
+            uint32_t vertexOffset = static_cast<uint32_t>(vertices.size());
+            vertices.insert(vertices.end(), mesh.vertices.begin(), mesh.vertices.end());
+            uint32_t indexOffset = static_cast<uint32_t>(indices.size());
+            indices.insert(indices.end(), mesh.indices.begin(), mesh.indices.end());
+            return VulkMeshRef{mesh.name, vertexOffset, indexOffset, static_cast<uint32_t>(mesh.indices.size())};
+        }
+    } meshAccumulator;
     VkDeviceMemory vertexBufferMemory;
     VkDeviceMemory indexBufferMemory;
     VkImage textureImage;
@@ -109,27 +101,56 @@ class Scene : public Vulk {
     VkImageView textureImageView;
     VkSampler textureSampler;
 
+    bool rotateWorld = false;
 public:
     void init() override {
         createDescriptorSetLayoutBinding();
         createGraphicsPipeline();
 
-        VulkMesh tri, quad, cyl, sphere, axes;
+        VulkMesh tri, floor, cyl, sphere, axes;
         makeEquilateralTri(1.f, 1, tri);
-        makeQuad(1.f, .5f, 0, quad);
-        makeCylinder(1.0f, .2f, .2f, 32, 32, cyl);
-        makeGeoSphere(0.4f, 3, sphere);
+        makeQuad(4.f, 4.f, 0, floor);
+        makeCylinder(1.f, .2f, .2f, 32, 32, cyl);
+        makeGeoSphere(0.25f, 3, sphere);
         makeAxes(1.0f, axes);
         VulkMeshRef triRef = meshAccumulator.appendMesh(tri);
-        VulkMeshRef quadRef = meshAccumulator.appendMesh(quad);
-        VulkMeshRef cylRef = meshAccumulator.appendMesh(cyl);
+        VulkMeshRef quadRef = meshAccumulator.appendMesh(floor);
+        VulkMeshRef cylinderRef = meshAccumulator.appendMesh(cyl);
         VulkMeshRef sphereRef = meshAccumulator.appendMesh(sphere);
         VulkMeshRef axesRef = meshAccumulator.appendMesh(axes);
 
+        camera.eye = glm::vec3(-.1f, 1.44f, 4.6f);
+        camera.yaw = 180.f;
+        camera.pitch = -15.f;
+
+        std::vector<VulkActor> sphereActors;
+        // make the ground plane: rotate it to the xz plane
+        sphereActors.push_back({"sphere0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.5f, 0.f))});
+        sphereActors.push_back({"sphere1", glm::translate(glm::mat4(1.0f), glm::vec3(2.f, 0.25f, 0.f))});
+        sphereActors.push_back({"sphere2", glm::translate(glm::mat4(1.0f), glm::vec3(1.f, 0.5f, 1.f))});
+        sphereActors.push_back({"sphere3", glm::translate(glm::mat4(1.0f), glm::vec3(-1.5f, 0.75f, -.5f))});
+        sphereActors.push_back({"sphere3", glm::translate(glm::mat4(1.0f), glm::vec3(-1.f, 1.0f, -1.5f))});        
+        meshActors["sphere"] = {
+            sphereRef,
+            sphereActors,
+        };
+
+        std::vector<VulkActor> cylinderActors;
+        // make the ground plane: rotate it to the xz plane
+        cylinderActors.push_back({"cylinder0", glm::translate(glm::mat4(1.0f), glm::vec3(0.25f, 0.5f, 0.f))});
+        cylinderActors.push_back({"cylinder1", glm::translate(glm::mat4(1.0f), glm::vec3(-.7f, 0.5f, 0.f))});
+        cylinderActors.push_back({"cylinder2", glm::translate(glm::mat4(1.0f), glm::vec3(-1.f, 0.5f, -1.f))});
+        cylinderActors.push_back({"cylinder3", glm::translate(glm::mat4(1.0f), glm::vec3(-1.2f, 0.5f, 1.f))});        
+        meshActors["cylinder"] = {
+            cylinderRef,
+            cylinderActors,
+        };
+
+
         std::vector<VulkActor> quadActors;
-        quadActors.push_back({"quad1", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, .5f, 0.f))});
-        quadActors.push_back({"quad0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, -0.1f, 0.f))});
-        meshActors["quad"] = {
+        // make the ground plane: rotate it to the xz plane
+        quadActors.push_back({"floor0", glm::rotate(glm::mat4(1.0f), glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f))});
+        meshActors["floor"] = {
             quadRef,
             quadActors,
         };
@@ -434,6 +455,9 @@ private:
         static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+        if (!rotateWorld) {
+            time = 0.0f;
+        }
         ubo.world = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         glm::vec3 fwd = camera.getForwardVec();
         glm::vec3 lookAt = camera.eye + fwd;

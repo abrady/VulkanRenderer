@@ -22,6 +22,8 @@ For geometry lets hand-make a box, cylinder, sphere
 # Log
 
 ## 12/24 would you please start making a scene
+![Alt text](Assets/Screenshots/first_scene.png)
+~Look at that ugly-ass scene!~
 * make a scene: 
     * I'd like the axes to be rendered properly
     * let's make a floor

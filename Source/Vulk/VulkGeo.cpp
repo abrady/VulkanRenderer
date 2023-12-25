@@ -324,9 +324,14 @@ void makeAxes(float length, VulkMesh &meshData) {
     glm::mat4 rotX = glm::rotate(glm::mat4(1.0f), glm::pi<float>() / 2.0f, glm::vec3(0.0f, 0.0f, 1.0f));
     glm::mat4 rotAndTranslateX = glm::translate(glm::mat4(1.0f), glm::vec3(length / 2.0f, 0.0f, 0.0f)) * rotX;
     x.xform(rotAndTranslateX);
+
+    glm::mat4 transY = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, length / 2.0f, 0.0f));
+    y.xform(transY);
+
     glm::mat4 rotZ = glm::rotate(glm::mat4(1.0f), glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
     glm::mat4 rotAndTranslateZ = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, length / 2.0f)) * rotZ;
     z.xform(rotAndTranslateZ);
+
 
     meshData.appendMesh(x);
     meshData.appendMesh(y);

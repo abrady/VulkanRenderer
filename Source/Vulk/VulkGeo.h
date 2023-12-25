@@ -1,3 +1,9 @@
+/***************************************************************************
+ *  Description:  Geometry generation functions
+ * All generated geo is
+ * 1. centered at (0,0) and 
+ * 2. tends to be on the x/y plane where applicable
+ ***************************************************************************/
 #pragma once
 
 #include "VulkUtil.h"
@@ -6,6 +12,7 @@ class VulkMesh;
 
 void makeEquilateralTri(float side, uint32_t numSubdivisions, VulkMesh &meshData);
 
+// make a quad in the x/y centered at 0,0
 void makeQuad(float w, float h, uint32_t numSubdivisions, VulkMesh &meshData);
 void makeQuad(float x, float y, float w, float h, float depth, uint32_t numSubdivisions, VulkMesh &meshData);
 
