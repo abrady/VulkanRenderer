@@ -107,58 +107,24 @@ public:
         createDescriptorSetLayoutBinding();
         createGraphicsPipeline();
 
-        VulkMesh tri, floor, cyl, sphere, axes;
-        makeEquilateralTri(1.f, 1, tri);
-        makeQuad(4.f, 4.f, 0, floor);
-        makeCylinder(1.f, .2f, .2f, 32, 32, cyl);
-        makeGeoSphere(0.25f, 3, sphere);
-        makeAxes(1.0f, axes);
-        VulkMeshRef triRef = meshAccumulator.appendMesh(tri);
-        VulkMeshRef quadRef = meshAccumulator.appendMesh(floor);
-        VulkMeshRef cylinderRef = meshAccumulator.appendMesh(cyl);
-        VulkMeshRef sphereRef = meshAccumulator.appendMesh(sphere);
-        VulkMeshRef axesRef = meshAccumulator.appendMesh(axes);
+        camera.lookAt(glm::vec3(100.f, 250.f, 930.f), glm::vec3(0.f, 0.f, 0.f));
 
-        camera.eye = glm::vec3(-.1f, 1.44f, 4.6f);
-        camera.yaw = 180.f;
-        camera.pitch = -15.f;
+        VulkMesh terrain;
+        makeGrid(1000, 1000, 100, 100, terrain);
+        VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
 
         std::vector<VulkActor> sphereActors;
-        // make the ground plane: rotate it to the xz plane
-        sphereActors.push_back({"sphere0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.5f, 0.f))});
-        sphereActors.push_back({"sphere1", glm::translate(glm::mat4(1.0f), glm::vec3(2.f, 0.25f, 0.f))});
-        sphereActors.push_back({"sphere2", glm::translate(glm::mat4(1.0f), glm::vec3(1.f, 0.5f, 1.f))});
-        sphereActors.push_back({"sphere3", glm::translate(glm::mat4(1.0f), glm::vec3(-1.5f, 0.75f, -.5f))});
-        sphereActors.push_back({"sphere3", glm::translate(glm::mat4(1.0f), glm::vec3(-1.f, 1.0f, -1.5f))});        
-        meshActors["sphere"] = {
-            sphereRef,
-            sphereActors,
+        meshActors["terrain"] = {
+            meshAccumulator.appendMesh(terrain),
+            {{"terrain0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
         };
 
-        std::vector<VulkActor> cylinderActors;
-        // make the ground plane: rotate it to the xz plane
-        cylinderActors.push_back({"cylinder0", glm::translate(glm::mat4(1.0f), glm::vec3(0.25f, 0.5f, 0.f))});
-        cylinderActors.push_back({"cylinder1", glm::translate(glm::mat4(1.0f), glm::vec3(-.7f, 0.5f, 0.f))});
-        cylinderActors.push_back({"cylinder2", glm::translate(glm::mat4(1.0f), glm::vec3(-1.f, 0.5f, -1.f))});
-        cylinderActors.push_back({"cylinder3", glm::translate(glm::mat4(1.0f), glm::vec3(-1.2f, 0.5f, 1.f))});        
-        meshActors["cylinder"] = {
-            cylinderRef,
-            cylinderActors,
-        };
-
-
-        std::vector<VulkActor> quadActors;
-        // make the ground plane: rotate it to the xz plane
-        quadActors.push_back({"floor0", glm::rotate(glm::mat4(1.0f), glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f))});
-        meshActors["floor"] = {
-            quadRef,
-            quadActors,
-        };
-
+        VulkMesh axes;
+        makeAxes(100, axes);
         std::vector<VulkActor> axisActors;
         axisActors.push_back({"debugAxes", glm::mat4(1.0f)});
         meshActors["axes"] = {
-            axesRef,
+            meshAccumulator.appendMesh(axes),
             axisActors,
         };
 
@@ -463,7 +429,7 @@ private:
         glm::vec3 lookAt = camera.eye + fwd;
         glm::vec3 up = camera.getUpVec();
         ubo.view = glm::lookAt(camera.eye, lookAt, up);
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 1.f, 4000.0f);
         ubo.proj[1][1] *= -1;
     }
 
@@ -567,19 +533,20 @@ private:
             glm::vec3 fwd = camera.getForwardVec();
             glm::vec3 right = camera.getRightVec();
             glm::vec3 up = camera.getUpVec();
+            float move = 10.f;
             bool handled = true;
             if (key == GLFW_KEY_W) {
-                camera.eye += 0.1f * fwd;
+                camera.eye += move * fwd;
             } else if (key == GLFW_KEY_A) {
-                camera.eye -= 0.1f * right;
+                camera.eye -= move * right;
             } else if (key == GLFW_KEY_S) {
-                camera.eye -= 0.1f * fwd;
+                camera.eye -= move * fwd;
             } else if (key == GLFW_KEY_D) {
-                camera.eye += 0.1f * right;
+                camera.eye += move * right;
             } else if (key == GLFW_KEY_Q) {
-                camera.eye -= 0.1f * up;
+                camera.eye -= move * up;
             } else if (key == GLFW_KEY_E) {
-                camera.eye += 0.1f * up;
+                camera.eye += move * up;
             } else if (key == GLFW_KEY_LEFT) {
                 camera.yaw -= 15.0f;
             } else if (key == GLFW_KEY_RIGHT) {

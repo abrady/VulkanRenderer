@@ -21,3 +21,5 @@ void makeQuad(float x, float y, float w, float h, float depth, uint32_t numSubdi
 void makeCylinder(float height, float bottomRadius, float topRadius, uint32_t numStacks, uint32_t numSlices, VulkMesh &meshData);
 void makeGeoSphere(float radius, uint32_t numSubdivisions, VulkMesh &meshData);
 void makeAxes(float length, VulkMesh &meshData);
+
+void makeGrid(float width, float depth, uint32_t m, uint32_t n, VulkMesh &meshData);

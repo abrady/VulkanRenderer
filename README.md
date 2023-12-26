@@ -1,25 +1,44 @@
 # VulkanRenderer
 
-This is a series of adventures to try to learn how to make a renderer.
-1. Geometry
-1. Lighting
+This is a series of adventures to try to learn how to make a renderer. 
+
+I'm basically following Introduction to 3D Game Programming with DirectX 12 by Frank Luna which was recommended to me by a friend as a great guide (and so far, it is!)
 
 ...
 
-# Geometry
-For geometry lets hand-make a box, cylinder, sphere
+# Samples
+1. [Viking Room](Samples/VikingRoom.h) - loads a model and renders it
+2. [Shape Geometry](Samples/)
+3. [Scene](Samples/Scene.h) - a scene with a floor and some cylinders and spheres, uses instancing
+4. [Land and Waves](Samples/LandAndWaves.h) - a procedurally generated terrain example
 
-1. Box
+# Resources
+* [Vulkan Tutorial](https://vulkan-tutorial.com/Introduction)
 
+# Building
+* Clone the repo
 
-# Lighting
+Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
+* Install [Vulkan SDK](https://vulkan.lunarg.com/sdk/home)
+* Install [GLFW](https://www.glfw.org/)
+* Install [GLM](https://glm.g-truc.net/0.9.9/index.html)
+* Install [TinyObjLoader](https://github.com/tinyobjloader/tinyobjloader)
+* Install [STB](https://github.com/nothings/stb)
 
 # TODOs
-* look into vkDrawIndexedIndirect which can describe what it is drawing.
-* try the vertex offset in vkDrawIndexed so we don't have to fixup the indicies
-* switch to Shader Storage Buffer Objects (SSBOs) for the actor xforms
+* x look into vkDrawIndexedIndirect which can describe what it is drawing.
+* x try the vertex offset in vkDrawIndexed so we don't have to fixup the indicies
+* x switch to Shader Storage Buffer Objects (SSBOs) for the actor xforms
  
 # Log
+
+## 12/25 Procedural Terrain
+* Let's make a landscape:
+    * higher stuff has snow
+    * lower stuff is beach
+    * middle stuff is grassy
+    * (but just do colors for now)
+## 12/24 stop making a scene
 
 ## 12/24 would you please start making a scene
 ![Alt text](Assets/Screenshots/first_scene.png)

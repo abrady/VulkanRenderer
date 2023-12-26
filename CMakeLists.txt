@@ -148,7 +148,16 @@ add_custom_target(
 link_directories("$ENV{VK_SDK_PATH}\\Lib")
 link_directories("C:\\Vulkan\\glfw\\build\\src\\Debug")
 
-add_executable (VulkanRenderer "Source/main.cpp" "Source/Vulk/Vulk.cpp" "Source/Vulk/VulkGeo.cpp" "Source/Vulk/VulkUtil.cpp" "Source/Vulk/VulkMesh.cpp" "Source/Vulk/VulkActor.cpp")
+set(VULKAN_RENDERER_SOURCES
+    "Source/Vulk/Vulk.cpp"
+    "Source/Vulk/VulkGeo.cpp"
+    "Source/Vulk/VulkUtil.cpp"
+    "Source/Vulk/VulkMesh.cpp"
+    "Source/Vulk/VulkActor.cpp"
+    "Source/Vulk/VulkCamera.cpp"
+)
+
+add_executable (VulkanRenderer "Source/main.cpp" ${VULKAN_RENDERER_SOURCES})
 if(MSVC)
   target_compile_options(VulkanRenderer PRIVATE /W4 /WX)
 else()
