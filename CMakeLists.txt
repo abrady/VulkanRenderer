@@ -155,6 +155,7 @@ set(VULKAN_RENDERER_SOURCES
     "Source/Vulk/VulkMesh.cpp"
     "Source/Vulk/VulkActor.cpp"
     "Source/Vulk/VulkCamera.cpp"
+    "Source/Vulk/VulkDescriptorSetLayoutBuilder.cpp"
 )
 
 add_executable (VulkanRenderer "Source/main.cpp" ${VULKAN_RENDERER_SOURCES})

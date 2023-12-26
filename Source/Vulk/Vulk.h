@@ -59,7 +59,7 @@ public:
     VkImage createTextureImage(char const *texture_path, VkDeviceMemory& textureImageMemory, VkImage& textureImage);
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     VkShaderModule createShaderModule(const std::vector<char>& code);
-    
+    void createDescriptorSet(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, VkDescriptorSet& descriptorSet);
 protected:
     virtual void init() = 0;
     virtual void drawFrame(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer) = 0;

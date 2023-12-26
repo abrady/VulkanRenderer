@@ -26,16 +26,22 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 * Install [STB](https://github.com/nothings/stb)
 
 # TODOs
-* x look into vkDrawIndexedIndirect which can describe what it is drawing.
-* x try the vertex offset in vkDrawIndexed so we don't have to fixup the indicies
-* x switch to Shader Storage Buffer Objects (SSBOs) for the actor xforms
- 
+* I've been sloppy naming structs: MeshRender, MeshRenderInfo, MeshFrameResources: make this more coherent
+
+
 # Log
+
+## 12/26
+* render the waves
+* dynamically update the waves
 
 ## 12/25 add some water
 * create a grid
 * update the water position over time in CPU
 * update the buffer for rendering
+
+Notes:
+* did basic refactor so we can render the terrain and waves separately
 
 ## 12/25 Procedural Terrain
 ![Alt text](Assets/Screenshots/terrain_land.png)

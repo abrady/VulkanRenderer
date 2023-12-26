@@ -35,6 +35,9 @@
 #include <cassert>
 #include <vulkan/vk_enum_string_helper.h>
 
+#include "VulkDescriptorSetLayoutBuilder.h"
+#include "Vulk/VulkDescriptorSetUpdater.h"
+
 #define VK_CALL(func) \
 do { \
     VkResult vkcall_macro_result = (func); \
