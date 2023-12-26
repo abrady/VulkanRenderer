@@ -76,8 +76,6 @@ class LandAndWaves : public Vulk {
     };
     std::array<UBO, MAX_FRAMES_IN_FLIGHT> ubos;
 
-    VulkMesh waves;
-
     struct MeshRender {
         VkBuffer vertexBuffer;
         VkDeviceMemory vertexBufferMemory;
@@ -103,13 +101,16 @@ class LandAndWaves : public Vulk {
         }
     };
 
+    VkDescriptorSetLayout actorsDescriptorSetLayout;
     MeshRender actorsRender;
-    MeshRender wavesRender;
 
+    VulkMesh waves;
+    MeshRender wavesRender;
+    VkDescriptorSetLayout wavesDescriptorSetLayout;
+    VkDescriptorSet wavesDescriptorSet;
     VkBuffer wavesVertexBuffer;
     VkBuffer wavesIndexBuffer;
 
-    VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
 
@@ -137,7 +138,12 @@ class LandAndWaves : public Vulk {
 
 public:
     void init() override {
-        createDescriptorSetLayoutBinding();
+        VulkDescriptorSetLayoutBuilder actorsDescriptorSetLayoutBuilder;
+        actorsDescriptorSetLayoutBuilder.addUniformBuffer(0);
+        actorsDescriptorSetLayoutBuilder.addSampler(1);
+        actorsDescriptorSetLayoutBuilder.addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT);
+        actorsDescriptorSetLayoutBuilder.build(*this, actorsDescriptorSetLayout);
+
         createGraphicsPipeline();
 
         camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
@@ -165,7 +171,7 @@ public:
         for (auto &ubo: ubos) {
             ubo.createUniformBuffers(*this);
         }
-        createDescriptorPool(static_cast<uint32_t>(meshActors.size()));
+        createDescriptorPool(static_cast<uint32_t>(meshActors.size()) + 1); // 1 for the waves
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
@@ -176,92 +182,26 @@ public:
                 res.buf.createAndMap(*this, numActors);
 
                 // create the descriptor set
-                VkDescriptorSetAllocateInfo allocInfo{};
-                allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-                allocInfo.descriptorPool = descriptorPool;
-                allocInfo.descriptorSetCount = 1;
-                allocInfo.pSetLayouts = &descriptorSetLayout;
-
-                VK_CALL(vkAllocateDescriptorSets(device, &allocInfo, &res.descriptorSet));
-
-                VkDescriptorBufferInfo uniformBufferInfo{};
-                uniformBufferInfo.buffer = ubos[i].buf;
-                uniformBufferInfo.offset = 0;
-                uniformBufferInfo.range = sizeof(UniformBufferObject);
-
-                VkDescriptorBufferInfo actorInstanceBufferInfo = {};
-                actorInstanceBufferInfo.buffer = res.buf.buf;
-                actorInstanceBufferInfo.offset = 0;
-                actorInstanceBufferInfo.range = sizeof(ActorSSBOElt) * numActors;
-
-                VkDescriptorImageInfo imageInfo{};
-                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = textureImageView;
-                imageInfo.sampler = textureSampler;
-
-                std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
-                descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                descriptorWrites[0].dstSet = res.descriptorSet;
-                descriptorWrites[0].dstBinding = 0;
-                descriptorWrites[0].dstArrayElement = 0;
-                descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                descriptorWrites[0].descriptorCount = 1;
-                descriptorWrites[0].pBufferInfo = &uniformBufferInfo;
-
-                descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                descriptorWrites[1].dstSet = res.descriptorSet;
-                descriptorWrites[1].dstBinding = 1;
-                descriptorWrites[1].dstArrayElement = 0;
-                descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                descriptorWrites[1].descriptorCount = 1;
-                descriptorWrites[1].pImageInfo = &imageInfo;
-
-                descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                descriptorWrites[2].dstSet = res.descriptorSet;
-                descriptorWrites[2].dstBinding = 2;
-                descriptorWrites[2].dstArrayElement = 0;
-                descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                descriptorWrites[2].descriptorCount = 1;
-                descriptorWrites[2].pBufferInfo = &actorInstanceBufferInfo;
-
-                vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+                createDescriptorSet(actorsDescriptorSetLayout, descriptorPool, res.descriptorSet);
+                VulkDescriptorSetUpdater descriptorSetUpdater(res.descriptorSet);
+                descriptorSetUpdater.addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0);
+                descriptorSetUpdater.addImageSampler(textureImageView, textureSampler, 1);
+                descriptorSetUpdater.addStorageBuffer(res.buf.buf, sizeof(ActorSSBOElt) * numActors, 2);
+                descriptorSetUpdater.update(device);
             }
         }
+
+        // waves
+        VulkDescriptorSetLayoutBuilder wavesDescriptorSetLayoutBuilder;
+        wavesDescriptorSetLayoutBuilder.build(*this, wavesDescriptorSetLayout);
+        createDescriptorSet(wavesDescriptorSetLayout, descriptorPool, wavesDescriptorSet);
+        VulkDescriptorSetUpdater wavesDescriptorSetUpdater(wavesDescriptorSet);
+        wavesDescriptorSetUpdater.update(device);
+        createDescriptorSet(wavesDescriptorSetLayout, descriptorPool, wavesDescriptorSet);
 
     }
 
 private:
-    void createDescriptorSetLayoutBinding() {
-        VkDescriptorSetLayoutBinding uboLayoutBinding{};
-        uboLayoutBinding.binding = 0;
-        uboLayoutBinding.descriptorCount = 1;
-        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-        VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-        samplerLayoutBinding.binding = 1;
-        samplerLayoutBinding.descriptorCount = 1;
-        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        samplerLayoutBinding.pImmutableSamplers = nullptr;
-        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutBinding actorInstanceLayoutBinding = {};
-        actorInstanceLayoutBinding.binding = 2;
-        actorInstanceLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // SSBO
-        actorInstanceLayoutBinding.descriptorCount = 1;
-        actorInstanceLayoutBinding.pImmutableSamplers = nullptr;
-        actorInstanceLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-        std::array<VkDescriptorSetLayoutBinding, 3> bindings = { uboLayoutBinding, samplerLayoutBinding, actorInstanceLayoutBinding };
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-        layoutInfo.pBindings = bindings.data();
-
-        VK_CALL(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout));
-    }
-
     void createGraphicsPipeline() {
         char const *vert_shader_path = "Assets/Shaders/Vert/terrain.spv";
         char const *frag_shader_path = "Assets/Shaders/Frag/terrain.spv";
@@ -357,7 +297,7 @@ private:
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+        pipelineLayoutInfo.pSetLayouts = &actorsDescriptorSetLayout;
 
         VK_CALL(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
 
@@ -463,8 +403,8 @@ private:
         scissor.extent = swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        VkBuffer vertexBuffers[] = { actorsRender.vertexBuffer };
-        VkDeviceSize offsets[] = { 0 };
+        VkBuffer vertexBuffers[] = { actorsRender.vertexBuffer, wavesRender.vertexBuffer };
+        VkDeviceSize offsets[] = { 0, 0 };
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
         vkCmdBindIndexBuffer(commandBuffer, actorsRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
@@ -475,6 +415,10 @@ private:
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &res.descriptorSet, 0, nullptr);
             vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
         }
+
+        // vkCmdBindIndexBuffer(commandBuffer, wavesRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        // vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &wavesDescriptorSet, 0, nullptr);
+        // vkCmdDrawIndexed(commandBuffer, (uint32_t)waves.indices.size(), 1, 0, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -495,13 +439,15 @@ private:
             meshActor.second.cleanup(device);
         }
 
-        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(device, actorsDescriptorSetLayout, nullptr);
         vkDestroyDescriptorPool(device, descriptorPool, nullptr);
         vkDestroySampler(device, textureSampler, nullptr);
         vkDestroyImageView(device, textureImageView, nullptr);
         vkDestroyImage(device, textureImage, nullptr);
         vkFreeMemory(device, textureImageMemory, nullptr);
         actorsRender.cleanup(*this);
+
+        vkDestroyDescriptorSetLayout(device, wavesDescriptorSetLayout, nullptr);
         wavesRender.cleanup(*this);
     }
 

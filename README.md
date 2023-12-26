@@ -26,16 +26,23 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 * Install [STB](https://github.com/nothings/stb)
 
 # TODOs
-* x look into vkDrawIndexedIndirect which can describe what it is drawing.
-* x try the vertex offset in vkDrawIndexed so we don't have to fixup the indicies
-* x switch to Shader Storage Buffer Objects (SSBOs) for the actor xforms
- 
+* I've been sloppy naming structs: MeshRender, MeshRenderInfo, MeshFrameResources: make this more coherent
+
+
 # Log
+* after a long time of copy-pasta-ing all the vulkan boilerplate I finally broke down and packed a few things up. Partly this is because in my experience it is easy to write wrappers thatt don't add value until you really understand how the code is being used. In this case the level of abstraction that seems useful for descriptor sets seems to be at the type of thing (e.g. uniform, texture sampler, shader buffer) so I'm giving that a try qirh the VulkDescriptorSetLayoutBuilder and VulkDescriptorSetUpdater, both of which provide helper one function for each of these types.q
+
+## 12/26
+* render the waves
+* dynamically update the waves
 
 ## 12/25 add some water
 * create a grid
 * update the water position over time in CPU
 * update the buffer for rendering
+
+Notes:
+* did basic refactor so we can render the terrain and waves separately
 
 ## 12/25 Procedural Terrain
 ![Alt text](Assets/Screenshots/terrain_land.png)
