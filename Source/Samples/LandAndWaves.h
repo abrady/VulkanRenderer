@@ -102,30 +102,27 @@ class LandAndWaves : public Vulk {
     VkSampler textureSampler;
 
     bool rotateWorld = false;
+
+    float getHeight(Vertex const &v) {
+        return 0.3f * (v.pos.z * sinf(0.1f * v.pos.x) + v.pos.x * cosf(0.1f * v.pos.z));
+    }
 public:
     void init() override {
         createDescriptorSetLayoutBinding();
         createGraphicsPipeline();
 
-        camera.lookAt(glm::vec3(100.f, 250.f, 930.f), glm::vec3(0.f, 0.f, 0.f));
+        camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
 
         VulkMesh terrain;
-        makeGrid(1000, 1000, 100, 100, terrain);
+        makeGrid(160, 160, 50, 50, terrain);
+        for (auto &v : terrain.vertices) {
+            v.pos.y = getHeight(v);
+        }
         VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
 
-        std::vector<VulkActor> sphereActors;
         meshActors["terrain"] = {
             meshAccumulator.appendMesh(terrain),
             {{"terrain0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
-        };
-
-        VulkMesh axes;
-        makeAxes(100, axes);
-        std::vector<VulkActor> axisActors;
-        axisActors.push_back({"debugAxes", glm::mat4(1.0f)});
-        meshActors["axes"] = {
-            meshAccumulator.appendMesh(axes),
-            axisActors,
         };
 
         createVertexBuffer();
@@ -234,8 +231,8 @@ private:
     }
 
     void createGraphicsPipeline() {
-        char const *vert_shader_path = "Assets/Shaders/Vert/instance.spv";
-        char const *frag_shader_path = "Assets/Shaders/Frag/instance.spv";
+        char const *vert_shader_path = "Assets/Shaders/Vert/terrain.spv";
+        char const *frag_shader_path = "Assets/Shaders/Frag/terrain.spv";
 
         auto vertShaderCode = readFileIntoMem(vert_shader_path);
         auto fragShaderCode = readFileIntoMem(frag_shader_path);

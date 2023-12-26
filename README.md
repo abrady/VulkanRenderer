@@ -33,6 +33,11 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 # Log
 
 ## 12/25 Procedural Terrain
+![Alt text](Assets/Screenshots/terrain_land.png)
+very basic results of terrain:
+* adjust the heights based on x/y noise function
+* use the frag shader to color based on passed in height
+
 * Let's make a landscape:
     * higher stuff has snow
     * lower stuff is beach
