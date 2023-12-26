@@ -37,10 +37,10 @@
 
 #define VK_CALL(func) \
 do { \
-    VkResult result = (func); \
-    if (result != VK_SUCCESS) { \
-        std::cerr << "Vulkan error: " << string_VkResult(result) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-        throw std::runtime_error(std::string("Vulkan error: ") + string_VkResult(result) + " at " + __FILE__ + ":" + std::to_string(__LINE__)); \
+    VkResult vkcall_macro_result = (func); \
+    if (vkcall_macro_result != VK_SUCCESS) { \
+        std::cerr << "Vulkan error: " << string_VkResult(vkcall_macro_result) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        throw std::runtime_error(std::string("Vulkan error: ") + string_VkResult(vkcall_macro_result) + " at " + __FILE__ + ":" + std::to_string(__LINE__)); \
     } \
 } while (0)
 
