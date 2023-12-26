@@ -14,7 +14,7 @@ class LandAndWaves : public Vulk {
     VulkCamera camera;
 
     struct ActorSSBOElt {
-        glm::mat4 xform;  
+        glm::mat4 xform;
     };
 
     struct ActorSSBO {
@@ -76,12 +76,42 @@ class LandAndWaves : public Vulk {
     };
     std::array<UBO, MAX_FRAMES_IN_FLIGHT> ubos;
 
+    VulkMesh waves;
+
+    struct MeshRender {
+        VkBuffer vertexBuffer;
+        VkDeviceMemory vertexBufferMemory;
+
+        VkBuffer indexBuffer;
+        VkDeviceMemory indexBufferMemory;
+
+        void init(Vulk &vk, std::vector<Vertex> const &vertices, std::vector<uint32_t> const &indices) {
+            VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();    
+            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+            vk.copyFromMemToBuffer(vertices.data(), vertexBuffer, bufferSize);
+
+            bufferSize = sizeof(indices[0]) * indices.size();
+            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+            vk.copyFromMemToBuffer(indices.data(), indexBuffer, bufferSize); 
+        }
+
+        void cleanup(Vulk &vk) {
+            vkDestroyBuffer(vk.device, vertexBuffer, nullptr);
+            vkFreeMemory(vk.device, vertexBufferMemory, nullptr);
+            vkDestroyBuffer(vk.device, indexBuffer, nullptr);
+            vkFreeMemory(vk.device, indexBufferMemory, nullptr);
+        }
+    };
+
+    MeshRender actorsRender;
+    MeshRender wavesRender;
+
+    VkBuffer wavesVertexBuffer;
+    VkBuffer wavesIndexBuffer;
+
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
-
-    VkBuffer vertexBuffer;
-    VkBuffer indexBuffer;
 
     struct MeshAccumulator {
         std::vector<Vertex> vertices;
@@ -94,8 +124,6 @@ class LandAndWaves : public Vulk {
             return VulkMeshRef{mesh.name, vertexOffset, indexOffset, static_cast<uint32_t>(mesh.indices.size())};
         }
     } meshAccumulator;
-    VkDeviceMemory vertexBufferMemory;
-    VkDeviceMemory indexBufferMemory;
     VkImage textureImage;
     VkDeviceMemory textureImageMemory;
     VkImageView textureImageView;
@@ -103,9 +131,10 @@ class LandAndWaves : public Vulk {
 
     bool rotateWorld = false;
 
-    float getHeight(Vertex const &v) {
+    float getTerrainHeight(Vertex const &v) {
         return 0.3f * (v.pos.z * sinf(0.1f * v.pos.x) + v.pos.x * cosf(0.1f * v.pos.z));
     }
+
 public:
     void init() override {
         createDescriptorSetLayoutBinding();
@@ -116,17 +145,20 @@ public:
         VulkMesh terrain;
         makeGrid(160, 160, 50, 50, terrain);
         for (auto &v : terrain.vertices) {
-            v.pos.y = getHeight(v);
+            v.pos.y = getTerrainHeight(v);
         }
-        VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
 
+        VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
         meshActors["terrain"] = {
             meshAccumulator.appendMesh(terrain),
             {{"terrain0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
         };
 
-        createVertexBuffer();
-        createIndexBuffer();
+        makeGrid(160, 160, 50, 50, waves);
+
+        actorsRender.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
+        wavesRender.init(*this, waves.vertices, waves.indices);
+
         createTextureImage("Assets/Textures/uv_checker.png", textureImageMemory, textureImage);
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
         textureSampler = createTextureSampler();
@@ -142,7 +174,7 @@ public:
                 MeshFrameResources &res = meshRenderInfo.meshRenderData[i];
                 // map the actor xforms into a mem-mapped SSBO
                 res.buf.createAndMap(*this, numActors);
-                
+
                 // create the descriptor set
                 VkDescriptorSetAllocateInfo allocInfo{};
                 allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -195,7 +227,7 @@ public:
                 vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
             }
         }
-        
+
     }
 
 private:
@@ -215,11 +247,11 @@ private:
         samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutBinding actorInstanceLayoutBinding = {};
-        actorInstanceLayoutBinding.binding = 2; 
+        actorInstanceLayoutBinding.binding = 2;
         actorInstanceLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; // SSBO
         actorInstanceLayoutBinding.descriptorCount = 1;
-        actorInstanceLayoutBinding.pImmutableSamplers = nullptr; 
-        actorInstanceLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; 
+        actorInstanceLayoutBinding.pImmutableSamplers = nullptr;
+        actorInstanceLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
         std::array<VkDescriptorSetLayoutBinding, 3> bindings = { uboLayoutBinding, samplerLayoutBinding, actorInstanceLayoutBinding };
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
@@ -357,7 +389,7 @@ private:
     }
 
     // each mesh has its own descriptor set and we need to allocate
-    // a descriptor for each item in the set. 
+    // a descriptor for each item in the set.
     void createDescriptorPool(uint32_t numMeshes) {
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -374,44 +406,6 @@ private:
         poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numMeshes);
 
         VK_CALL(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool));
-    }
-
-    void createVertexBuffer() {
-        VkDeviceSize bufferSize = meshAccumulator.vertices.size() * sizeof(meshAccumulator.vertices[0]);
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, meshAccumulator.vertices.data(), (size_t)bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-
-        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
-    }
-
-    void createIndexBuffer() {
-        VkDeviceSize bufferSize = meshAccumulator.indices.size() * sizeof(meshAccumulator.indices[0]);
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, meshAccumulator.indices.data(), (size_t)bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-
-        copyBuffer(stagingBuffer, indexBuffer, bufferSize);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
     void updateUniformBuffer(UniformBufferObject &ubo) {
@@ -475,11 +469,11 @@ private:
         scissor.extent = swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        VkBuffer vertexBuffers[] = { vertexBuffer };
+        VkBuffer vertexBuffers[] = { actorsRender.vertexBuffer };
         VkDeviceSize offsets[] = { 0 };
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindIndexBuffer(commandBuffer, actorsRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
         for (auto &meshActor: meshActors) {
             MeshRenderInfo &meshRenderInfo = meshActor.second;
@@ -515,10 +509,8 @@ private:
         vkDestroyImageView(device, textureImageView, nullptr);
         vkDestroyImage(device, textureImage, nullptr);
         vkFreeMemory(device, textureImageMemory, nullptr);
-        vkDestroyBuffer(device, indexBuffer, nullptr);
-        vkFreeMemory(device, indexBufferMemory, nullptr);
-        vkDestroyBuffer(device, vertexBuffer, nullptr);
-        vkFreeMemory(device, vertexBufferMemory, nullptr);
+        actorsRender.cleanup(*this);
+        wavesRender.cleanup(*this);
     }
 
     void handleEvents() override {

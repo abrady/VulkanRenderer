@@ -29,6 +29,19 @@ void Vulk::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPro
     vkBindBufferMemory(device, buffer, bufferMemory, 0);
 }
 
+void Vulk::copyFromMemToBuffer(void const *srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    void *data;
+    vkMapMemory(device, stagingBufferMemory, 0, size, 0, &data);
+    memcpy(data, srcBuffer, size);
+    vkUnmapMemory(device, stagingBufferMemory);
+    copyBuffer(stagingBuffer, dstBuffer, size);
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
 void Vulk::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
 {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();

@@ -32,6 +32,11 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
  
 # Log
 
+## 12/25 add some water
+* create a grid
+* update the water position over time in CPU
+* update the buffer for rendering
+
 ## 12/25 Procedural Terrain
 ![Alt text](Assets/Screenshots/terrain_land.png)
 very basic results of terrain:
