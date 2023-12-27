@@ -15,16 +15,18 @@ void VulkPipelineBuilder::addShaderStage(VkShaderStageFlagBits stage, char const
 
     shaderStages.push_back(shaderStageInfo);
     shaderModules.push_back(shaderModule);
+    return *this;
 }
 
-void VulkPipelineBuilder::addVertexInputBindingDescription(uint32_t binding, uint32_t stride, VkVertexInputRate inputRate)
+VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputBindingDescription(uint32_t binding, uint32_t stride, VkVertexInputRate inputRate)
 {
     bindingDescription.binding = binding;
     bindingDescription.stride = stride;
     bindingDescription.inputRate = inputRate;
+    return *this;
 }
 
-void VulkPipelineBuilder::addVertexInputField(uint32_t binding, uint32_t location, uint32_t offset, VkFormat format)
+VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputField(uint32_t binding, uint32_t location, uint32_t offset, VkFormat format)
 {
     VkVertexInputAttributeDescription attributeDescription{};
     attributeDescription.binding = binding;
@@ -32,16 +34,17 @@ void VulkPipelineBuilder::addVertexInputField(uint32_t binding, uint32_t locatio
     attributeDescription.format = format;
     attributeDescription.offset = offset;
     attributeDescriptions.push_back(attributeDescription);
+    return *this;
 }
 
-void VulkPipelineBuilder::addVertexInputFieldVec3(uint32_t binding, uint32_t location, uint32_t offset)
+VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputFieldVec3(uint32_t binding, uint32_t location, uint32_t offset)
 {
-    addVertexInputField(binding, location, offset, VK_FORMAT_R32G32B32_SFLOAT);
+    return addVertexInputField(binding, location, offset, VK_FORMAT_R32G32B32_SFLOAT);
 }
 
-void VulkPipelineBuilder::addVertexInputFieldVec2(uint32_t binding, uint32_t location, uint32_t offset)
+VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputFieldVec2(uint32_t binding, uint32_t location, uint32_t offset)
 {
-    addVertexInputField(binding, location, offset, VK_FORMAT_R32G32_SFLOAT);
+    return addVertexInputField(binding, location, offset, VK_FORMAT_R32G32_SFLOAT);
 }
 
 void VulkPipelineBuilder::build(VkRenderPass renderPass, VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout &pipelineLayout, VkPipeline &graphicsPipeline)

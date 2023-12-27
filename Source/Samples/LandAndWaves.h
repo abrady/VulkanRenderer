@@ -5,6 +5,7 @@
 #include "Vulk/VulkActor.h"
 #include "Vulk/VulkCamera.h"
 #include "Vulk/VulkPipelineBuilder.h"
+#include "Vulk/VulkDescriptorPoolBuilder.h"
 
 class LandAndWaves : public Vulk {
     struct UniformBufferObject {
@@ -43,7 +44,7 @@ class LandAndWaves : public Vulk {
         }
     };
 
-    VkDescriptorPool descriptorPool;
+    VkDescriptorPool actorsDescriptorPool;
 
     struct MeshRenderInfo {
         VulkMeshRef meshRef; // what we're drawing
@@ -139,11 +140,11 @@ class LandAndWaves : public Vulk {
 
 public:
     void init() override {
-        VulkDescriptorSetLayoutBuilder actorsDescriptorSetLayoutBuilder;
-        actorsDescriptorSetLayoutBuilder.addUniformBuffer(0);
-        actorsDescriptorSetLayoutBuilder.addSampler(1);
-        actorsDescriptorSetLayoutBuilder.addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT);
-        actorsDescriptorSetLayoutBuilder.build(*this, actorsDescriptorSetLayout);
+        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+            .addUniformBuffer(0)
+            .addSampler(1)
+            .addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT)
+            .build(*this);
 
         VulkPipelineBuilder pipelineBuilder(*this);
         pipelineBuilder.addVertexShaderStage("Assets/Shaders/Vert/terrain.spv");
@@ -181,7 +182,13 @@ public:
         for (auto &ubo: ubos) {
             ubo.createUniformBuffers(*this);
         }
-        createDescriptorPool(static_cast<uint32_t>(meshActors.size()) + 1); // 1 for the waves
+        uint32_t numMeshes = static_cast<uint32_t>(meshActors.size());
+        actorsDescriptorPool = VulkDescriptorPoolBuilder()
+            .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
+            .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
+            .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
+            .build(device);
+
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
@@ -192,7 +199,7 @@ public:
                 res.buf.createAndMap(*this, numActors);
 
                 // create the descriptor set
-                createDescriptorSet(actorsDescriptorSetLayout, descriptorPool, res.descriptorSet);
+                createDescriptorSet(actorsDescriptorSetLayout, actorsDescriptorPool, res.descriptorSet);
                 VulkDescriptorSetUpdater descriptorSetUpdater(res.descriptorSet);
                 descriptorSetUpdater.addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0);
                 descriptorSetUpdater.addImageSampler(textureImageView, textureSampler, 1);
@@ -202,36 +209,19 @@ public:
         }
 
         // waves
-        VulkDescriptorSetLayoutBuilder wavesDescriptorSetLayoutBuilder;
-        wavesDescriptorSetLayoutBuilder.build(*this, wavesDescriptorSetLayout);
-        createDescriptorSet(wavesDescriptorSetLayout, descriptorPool, wavesDescriptorSet);
+        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+            .addUniformBuffer(0)
+            .build(*this);
+        wavesDescriptorPool = VulkDescriptorPoolBuilder()
+            .addUniformBufferCount()
+        createDescriptorSet(wavesDescriptorSetLayout, actorsDescriptorPool, wavesDescriptorSet);
         VulkDescriptorSetUpdater wavesDescriptorSetUpdater(wavesDescriptorSet);
         wavesDescriptorSetUpdater.update(device);
-        createDescriptorSet(wavesDescriptorSetLayout, descriptorPool, wavesDescriptorSet);
+        createDescriptorSet(wavesDescriptorSetLayout, actorsDescriptorPool, wavesDescriptorSet);
 
     }
 
 private:
-
-    // each mesh has its own descriptor set and we need to allocate
-    // a descriptor for each item in the set.
-    void createDescriptorPool(uint32_t numMeshes) {
-        std::array<VkDescriptorPoolSize, 3> poolSizes{};
-        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numMeshes);
-        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numMeshes);
-        poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numMeshes);
-
-        VkDescriptorPoolCreateInfo poolInfo{};
-        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-        poolInfo.pPoolSizes = poolSizes.data();
-        poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * numMeshes);
-
-        VK_CALL(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool));
-    }
 
     void updateUniformBuffer(UniformBufferObject &ubo) {
         static auto startTime = std::chrono::high_resolution_clock::now();
@@ -329,7 +319,7 @@ private:
         }
 
         vkDestroyDescriptorSetLayout(device, actorsDescriptorSetLayout, nullptr);
-        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+        vkDestroyDescriptorPool(device, actorsDescriptorPool, nullptr);
         vkDestroySampler(device, textureSampler, nullptr);
         vkDestroyImageView(device, textureImageView, nullptr);
         vkDestroyImage(device, textureImage, nullptr);

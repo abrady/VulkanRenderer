@@ -4,6 +4,8 @@ This is a series of adventures to try to learn how to make a renderer.
 
 I'm basically following Introduction to 3D Game Programming with DirectX 12 by Frank Luna which was recommended to me by a friend as a great guide (and so far, it is!)
 
+Some quick thoughts on my approach: one thing you might notice is that I avoid wrapping a lot of the vulkan boilerplate in functions and structs for many of the samples. this makes for verbose code that can seem harder to understand at first glance, however, in my experience, premature abstractions both end up making code more confusing by hiding what is actually going on (i.e. what assumptions the abstraction made) and undermine the goal of code like this which is to understand how Vulkan works. I'm writing this note after six days of effort and my biggest regrets so far have all been premature encapsulation and the subsequent ex-capsulation. 
+
 ...
 
 # Samples
@@ -28,9 +30,24 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 # TODOs
 * I've been sloppy naming structs: MeshRender, MeshRenderInfo, MeshFrameResources: make this more coherent
 
-
 # Log
-* after a long time of copy-pasta-ing all the vulkan boilerplate I finally broke down and packed a few things up. Partly this is because in my experience it is easy to write wrappers thatt don't add value until you really understand how the code is being used. In this case the level of abstraction that seems useful for descriptor sets seems to be at the type of thing (e.g. uniform, texture sampler, shader buffer) so I'm giving that a try qirh the VulkDescriptorSetLayoutBuilder and VulkDescriptorSetUpdater, both of which provide helper one function for each of these types.q
+
+## 12/27
+* render the waves
+* dynamically update the waves
+
+Notes:
+* enough screwing around: get the water rendering issues out of the way. what issues do we have?
+    1. terrain has its own special shader because height is colored: we need a new shader for water
+    2. but shaders are bound to pipelines and immutible so we need to make a pipeline for water too
+    3. and we need our own descriptorsetalayout, descriptor set, pool, etc.
+    So:
+        * x make the water shaders
+        * make a descriptor set layout, descriptor set, and pool
+        * make a pipeline
+            * use the same ubo as the actor pipeline
+            * bind the same vertex description as well
+        * render
 
 ## 12/26
 * render the waves
@@ -38,6 +55,7 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 Notes:
 * validation errors: output of vertex shader doesn't match input of fragment...whoops, wrong vert shader
+* after a long time of copy-pasta-ing all the vulkan boilerplate I finally broke down and packed a few things up. Partly this is because in my experience it is easy to write wrappers thatt don't add value until you really understand how the code is being used. In this case the level of abstraction that seems useful for descriptor sets seems to be at the type of thing (e.g. uniform, texture sampler, shader buffer) so I'm giving that a try qirh the VulkDescriptorSetLayoutBuilder and VulkDescriptorSetUpdater, both of which provide helper one function for each of these types.q
 
 ## 12/26
 * render the waves

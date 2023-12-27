@@ -13,7 +13,7 @@ private:
 public:
     VulkDescriptorSetUpdater(VkDescriptorSet descriptorSet) : descriptorSet(descriptorSet) {}
 
-    void addUniformBuffer(VkBuffer buf, VkDeviceSize range, uint32_t binding) {
+    VulkDescriptorSetUpdater& addUniformBuffer(VkBuffer buf, VkDeviceSize range, uint32_t binding) {
         auto uniformBufferInfo = std::make_unique<VkDescriptorBufferInfo>();        
         uniformBufferInfo->buffer = buf;
         uniformBufferInfo->offset = 0;
@@ -29,9 +29,10 @@ public:
         writeDescriptorSet.pBufferInfo = uniformBufferInfo.get();
         descriptorWrites.push_back(writeDescriptorSet);
         bufferInfos.push_back(std::move(uniformBufferInfo));
+        return *this;
     }
 
-    void addImageSampler(VkImageView textureImageView, VkSampler textureSampler, uint32_t binding) {
+    VulkDescriptorSetUpdater& addImageSampler(VkImageView textureImageView, VkSampler textureSampler, uint32_t binding) {
         auto imageInfo = std::make_unique<VkDescriptorImageInfo>();
         imageInfo->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo->imageView = textureImageView;
@@ -48,9 +49,10 @@ public:
 
         descriptorWrites.push_back(writeDescriptorSet);
         imageInfos.push_back(std::move(imageInfo));
+        return *this;
     }
 
-    void addStorageBuffer(VkBuffer buf, VkDeviceSize range, uint32_t binding) {
+    VulkDescriptorSetUpdater& addStorageBuffer(VkBuffer buf, VkDeviceSize range, uint32_t binding) {
         auto storageInfo = std::make_unique<VkDescriptorBufferInfo>();
         storageInfo->buffer = buf;
         storageInfo->offset = 0;
@@ -67,6 +69,7 @@ public:
 
         descriptorWrites.push_back(writeDescriptorSet);
         bufferInfos.push_back(std::move(storageInfo));
+        return *this;
     }
 
     void update(VkDevice device) {

@@ -19,8 +19,8 @@ class VulkPipelineBuilder {
     VkPipelineDynamicStateCreateInfo dynamicState{};
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 
-    void addShaderStage(VkShaderStageFlagBits stage, char const *path);
-    void addVertexInputField(uint32_t binding, uint32_t location, uint32_t offset, VkFormat format);
+    VulkPipelineBuilder& addShaderStage(VkShaderStageFlagBits stage, char const *path);
+    VulkPipelineBuilder& addVertexInputField(uint32_t binding, uint32_t location, uint32_t offset, VkFormat format);
 public:
     VulkPipelineBuilder(Vulk &vk) : vk(vk) {}
     
@@ -34,9 +34,9 @@ public:
 
     // The binding says 'verts are in binding 0', and the stride says 'this is how far apart each vertex is'
     // then the field describe fields within the vertices: pos, normal, etc.
-    void addVertexInputBindingDescription(uint32_t binding, uint32_t stride, VkVertexInputRate inputRate = VK_VERTEX_INPUT_RATE_VERTEX);
-    void addVertexInputFieldVec3(uint32_t binding, uint32_t location, uint32_t fieldOffset);
-    void addVertexInputFieldVec2(uint32_t binding, uint32_t location, uint32_t fieldOffset);
+    VulkPipelineBuilder& addVertexInputBindingDescription(uint32_t binding, uint32_t stride, VkVertexInputRate inputRate = VK_VERTEX_INPUT_RATE_VERTEX);
+    VulkPipelineBuilder& addVertexInputFieldVec3(uint32_t binding, uint32_t location, uint32_t fieldOffset);
+    VulkPipelineBuilder& addVertexInputFieldVec2(uint32_t binding, uint32_t location, uint32_t fieldOffset);
 
     void build(VkRenderPass renderPass, VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout &pipelineLayout, VkPipeline &graphicsPipeline);
 };

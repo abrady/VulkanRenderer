@@ -2,7 +2,7 @@
 #include "VulkUtil.h"
 #include "Vulk.h"
 
-void VulkDescriptorSetLayoutBuilder::addUniformBuffer(uint32_t binding, VkShaderStageFlags stageFlags)
+VulkDescriptorSetLayoutBuilder& VulkDescriptorSetLayoutBuilder::addUniformBuffer(uint32_t binding, VkShaderStageFlags stageFlags)
 {
     VkDescriptorSetLayoutBinding layoutBinding{};
     layoutBinding.binding = binding;
@@ -10,9 +10,10 @@ void VulkDescriptorSetLayoutBuilder::addUniformBuffer(uint32_t binding, VkShader
     layoutBinding.descriptorCount = 1;
     layoutBinding.stageFlags = stageFlags;
     layoutBindings.push_back(layoutBinding);
+    return *this;
 }
 
-void VulkDescriptorSetLayoutBuilder::addSampler(uint32_t binding, VkShaderStageFlags stageFlags)
+VulkDescriptorSetLayoutBuilder& VulkDescriptorSetLayoutBuilder::addSampler(uint32_t binding, VkShaderStageFlags stageFlags)
 {
     VkDescriptorSetLayoutBinding layoutBinding{};
     layoutBinding.binding = binding;
@@ -20,9 +21,10 @@ void VulkDescriptorSetLayoutBuilder::addSampler(uint32_t binding, VkShaderStageF
     layoutBinding.descriptorCount = 1;
     layoutBinding.stageFlags = stageFlags;
     layoutBindings.push_back(layoutBinding);
+    return *this;
 }
 
-void VulkDescriptorSetLayoutBuilder::addStorageBuffer(uint32_t binding, VkShaderStageFlags stageFlags)
+VulkDescriptorSetLayoutBuilder& VulkDescriptorSetLayoutBuilder::addStorageBuffer(uint32_t binding, VkShaderStageFlags stageFlags)
 {
     VkDescriptorSetLayoutBinding layoutBinding{};
     layoutBinding.binding = binding;
@@ -30,14 +32,17 @@ void VulkDescriptorSetLayoutBuilder::addStorageBuffer(uint32_t binding, VkShader
     layoutBinding.descriptorCount = 1;
     layoutBinding.stageFlags = stageFlags;
     layoutBindings.push_back(layoutBinding);
+    return *this;
 }
 
-void VulkDescriptorSetLayoutBuilder::build(Vulk &vk, VkDescriptorSetLayout &descriptorSetLayout)
+VkDescriptorSetLayout VulkDescriptorSetLayoutBuilder::build(Vulk &vk)
 {
     VkDescriptorSetLayoutCreateInfo layoutCreateInfo{};
     layoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutCreateInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
     layoutCreateInfo.pBindings = layoutBindings.data();
 
+    VkDescriptorSetLayout descriptorSetLayout;
     VK_CALL(vkCreateDescriptorSetLayout(vk.device, &layoutCreateInfo, nullptr, &descriptorSetLayout));
+    return descriptorSetLayout;
 }
