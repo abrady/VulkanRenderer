@@ -36,6 +36,10 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 * render the waves
 * dynamically update the waves
 
+## 12/26
+* render the waves
+* dynamically update the waves
+
 ## 12/25 add some water
 * create a grid
 * update the water position over time in CPU
