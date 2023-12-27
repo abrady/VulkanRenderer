@@ -4,6 +4,7 @@
 #include "Vulk/VulkGeo.h"
 #include "Vulk/VulkActor.h"
 #include "Vulk/VulkCamera.h"
+#include "Vulk/VulkPipelineBuilder.h"
 
 class LandAndWaves : public Vulk {
     struct UniformBufferObject {
@@ -103,6 +104,8 @@ class LandAndWaves : public Vulk {
 
     VkDescriptorSetLayout actorsDescriptorSetLayout;
     MeshRender actorsRender;
+    VkPipelineLayout actorsPipelineLayout;
+    VkPipeline actorsGraphicsPipeline;
 
     VulkMesh waves;
     MeshRender wavesRender;
@@ -111,8 +114,6 @@ class LandAndWaves : public Vulk {
     VkBuffer wavesVertexBuffer;
     VkBuffer wavesIndexBuffer;
 
-    VkPipelineLayout pipelineLayout;
-    VkPipeline graphicsPipeline;
 
     struct MeshAccumulator {
         std::vector<Vertex> vertices;
@@ -144,7 +145,16 @@ public:
         actorsDescriptorSetLayoutBuilder.addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT);
         actorsDescriptorSetLayoutBuilder.build(*this, actorsDescriptorSetLayout);
 
-        createGraphicsPipeline();
+        VulkPipelineBuilder pipelineBuilder(*this);
+        pipelineBuilder.addVertexShaderStage("Assets/Shaders/Vert/terrain.spv");
+        pipelineBuilder.addVertexInputBindingDescription(0, sizeof(Vertex));
+        pipelineBuilder.addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos));
+        pipelineBuilder.addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal));
+        pipelineBuilder.addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent));
+        pipelineBuilder.addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord));
+        pipelineBuilder.addFragmentShaderStage("Assets/Shaders/Frag/terrain.spv");
+        pipelineBuilder.build(renderPass, actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
+
 
         camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
 
@@ -266,7 +276,7 @@ private:
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsGraphicsPipeline);
 
         VkViewport viewport{};
         viewport.x = 0.0f;
@@ -291,13 +301,13 @@ private:
         for (auto &meshActor: meshActors) {
             MeshRenderInfo &meshRenderInfo = meshActor.second;
             MeshFrameResources &res = meshRenderInfo.meshRenderData[currentFrame];
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &res.descriptorSet, 0, nullptr);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &res.descriptorSet, 0, nullptr);
             vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
         }
 
-        vkCmdBindIndexBuffer(commandBuffer, wavesRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &wavesDescriptorSet, 0, nullptr);
-        vkCmdDrawIndexed(commandBuffer, (uint32_t)waves.indices.size(), 1, 0, 0, 0);
+        // vkCmdBindIndexBuffer(commandBuffer, wavesRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        // vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &wavesDescriptorSet, 0, nullptr);
+        // vkCmdDrawIndexed(commandBuffer, (uint32_t)waves.indices.size(), 1, 0, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -305,8 +315,8 @@ private:
     }
 
     void cleanup() override {
-        vkDestroyPipeline(device, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        vkDestroyPipeline(device, actorsGraphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, actorsPipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
 
         for (auto ubo: ubos) {

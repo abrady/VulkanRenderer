@@ -36,6 +36,9 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 * render the waves
 * dynamically update the waves
 
+Notes:
+* validation errors: output of vertex shader doesn't match input of fragment...whoops, wrong vert shader
+
 ## 12/26
 * render the waves
 * dynamically update the waves
