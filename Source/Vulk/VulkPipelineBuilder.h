@@ -24,12 +24,12 @@ class VulkPipelineBuilder {
 public:
     VulkPipelineBuilder(Vulk &vk) : vk(vk) {}
     
-    void addVertexShaderStage(char const *path) {
-        addShaderStage(VK_SHADER_STAGE_VERTEX_BIT, path);
+    VulkPipelineBuilder& addVertexShaderStage(char const *path) {
+        return addShaderStage(VK_SHADER_STAGE_VERTEX_BIT, path);
     }
 
-    void addFragmentShaderStage(char const *path) {
-        addShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, path);
+    VulkPipelineBuilder& addFragmentShaderStage(char const *path) {
+        return addShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, path);
     }
 
     // The binding says 'verts are in binding 0', and the stride says 'this is how far apart each vertex is'

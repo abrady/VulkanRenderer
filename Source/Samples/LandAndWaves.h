@@ -43,9 +43,6 @@ class LandAndWaves : public Vulk {
             buf.cleanup(dev);
         }
     };
-
-    VkDescriptorPool actorsDescriptorPool;
-
     struct MeshRenderInfo {
         VulkMeshRef meshRef; // what we're drawing
         std::vector<VulkActor> actors; // the actors that use this mesh
@@ -64,6 +61,7 @@ class LandAndWaves : public Vulk {
             }
         }
     };
+    VkDescriptorPool actorsDescriptorPool;
     std::unordered_map<char const *, MeshRenderInfo> meshActors;
 
     struct UBO {
@@ -108,10 +106,12 @@ class LandAndWaves : public Vulk {
     VkPipelineLayout actorsPipelineLayout;
     VkPipeline actorsGraphicsPipeline;
 
-    VulkMesh waves;
-    MeshRender wavesRender;
+    VkPipeline wavesGraphicsPipeline;
+    VkDescriptorPool wavesDescriptorPool;
     VkDescriptorSetLayout wavesDescriptorSetLayout;
     VkDescriptorSet wavesDescriptorSet;
+    VulkMesh waves;
+    MeshRender wavesRender;
     VkBuffer wavesVertexBuffer;
     VkBuffer wavesIndexBuffer;
 
@@ -146,15 +146,15 @@ public:
             .addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT)
             .build(*this);
 
-        VulkPipelineBuilder pipelineBuilder(*this);
-        pipelineBuilder.addVertexShaderStage("Assets/Shaders/Vert/terrain.spv");
-        pipelineBuilder.addVertexInputBindingDescription(0, sizeof(Vertex));
-        pipelineBuilder.addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos));
-        pipelineBuilder.addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal));
-        pipelineBuilder.addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent));
-        pipelineBuilder.addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord));
-        pipelineBuilder.addFragmentShaderStage("Assets/Shaders/Frag/terrain.spv");
-        pipelineBuilder.build(renderPass, actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
+        VulkPipelineBuilder(*this)
+            .addVertexShaderStage("Assets/Shaders/Vert/terrain.spv")
+            .addVertexInputBindingDescription(0, sizeof(Vertex))
+            .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
+            .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
+            .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
+            .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
+            .addFragmentShaderStage("Assets/Shaders/Frag/terrain.spv")
+            .build(renderPass, actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
 
 
         camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
@@ -209,16 +209,16 @@ public:
         }
 
         // waves
-        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
-            .addUniformBuffer(0)
-            .build(*this);
-        wavesDescriptorPool = VulkDescriptorPoolBuilder()
-            .addUniformBufferCount()
-        createDescriptorSet(wavesDescriptorSetLayout, actorsDescriptorPool, wavesDescriptorSet);
-        VulkDescriptorSetUpdater wavesDescriptorSetUpdater(wavesDescriptorSet);
-        wavesDescriptorSetUpdater.update(device);
-        createDescriptorSet(wavesDescriptorSetLayout, actorsDescriptorPool, wavesDescriptorSet);
-
+        // wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        //     .addUniformBuffer(0)
+        //     .build(*this);
+        // wavesDescriptorPool = VulkDescriptorPoolBuilder()
+        //     .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
+        //     .build(device);
+        // createDescriptorSet(wavesDescriptorSetLayout, actorsDescriptorPool, wavesDescriptorSet);
+        // VulkDescriptorSetUpdater wavesDescriptorSetUpdater(wavesDescriptorSet);
+        // wavesDescriptorSetUpdater.update(device);
+        // createDescriptorSet(wavesDescriptorSetLayout, actorsDescriptorPool, wavesDescriptorSet);
     }
 
 private:

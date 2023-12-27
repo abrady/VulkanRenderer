@@ -2,7 +2,7 @@
 #include "Vulk.h"
 #include "VulkPipelineBuilder.h"
 
-void VulkPipelineBuilder::addShaderStage(VkShaderStageFlagBits stage, char const *path)
+VulkPipelineBuilder& VulkPipelineBuilder::addShaderStage(VkShaderStageFlagBits stage, char const *path)
 {
     auto shaderCode = readFileIntoMem(path);
     VkShaderModule shaderModule = vk.createShaderModule(shaderCode);
