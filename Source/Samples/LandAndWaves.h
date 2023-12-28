@@ -160,13 +160,13 @@ public:
             .build(*this);
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/model.spv")
+            .addVertexShaderStage("Assets/Shaders/Vert/terrain.spv")
             .addVertexInputBindingDescription(0, sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/model.spv")
+            .addFragmentShaderStage("Assets/Shaders/Frag/terrain.spv")
             .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
 
         VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
@@ -175,13 +175,12 @@ public:
             {{"terrain0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
         };
 
-        // VulkMesh temp;
+        // VulkMesh temp;;plo0-[]
         // makeGrid(160, 160, 50, 50, temp);
         // meshActors["temp"] = {
         //     meshAccumulator.appendMesh(temp),
         //     {{"temp0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
         // };
-
 
         actorsRender.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
         uint32_t numMeshes = static_cast<uint32_t>(meshActors.size());
@@ -218,23 +217,21 @@ public:
         wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(0)
             .addSampler(1)
-            .addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT)
             .build(*this);
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/model.spv")
+            .addVertexShaderStage("Assets/Shaders/Vert/waves.spv")
             .addVertexInputBindingDescription(0,sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/model.spv")
+            .addFragmentShaderStage("Assets/Shaders/Frag/waves.spv")
             .build(wavesDescriptorSetLayout, wavesPipelineLayout, wavesGraphicsPipeline);
 
         wavesDescriptorPool = VulkDescriptorPoolBuilder()
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
-            .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT)
             .build(device, MAX_FRAMES_IN_FLIGHT);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
