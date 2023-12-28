@@ -38,5 +38,5 @@ public:
     VulkPipelineBuilder& addVertexInputFieldVec3(uint32_t binding, uint32_t location, uint32_t fieldOffset);
     VulkPipelineBuilder& addVertexInputFieldVec2(uint32_t binding, uint32_t location, uint32_t fieldOffset);
 
-    void build(VkRenderPass renderPass, VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout &pipelineLayout, VkPipeline &graphicsPipeline);
+    void build(VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout &pipelineLayout, VkPipeline &graphicsPipeline);
 };

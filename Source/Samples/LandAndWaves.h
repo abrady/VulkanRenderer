@@ -106,10 +106,11 @@ class LandAndWaves : public Vulk {
     VkPipelineLayout actorsPipelineLayout;
     VkPipeline actorsGraphicsPipeline;
 
+    VkPipelineLayout wavesPipelineLayout;
     VkPipeline wavesGraphicsPipeline;
     VkDescriptorPool wavesDescriptorPool;
     VkDescriptorSetLayout wavesDescriptorSetLayout;
-    VkDescriptorSet wavesDescriptorSet;
+    std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> wavesDescriptorSets;
     VulkMesh waves;
     MeshRender wavesRender;
     VkBuffer wavesVertexBuffer;
@@ -154,7 +155,7 @@ public:
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
             .addFragmentShaderStage("Assets/Shaders/Frag/terrain.spv")
-            .build(renderPass, actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
+            .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
 
 
         camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
@@ -199,29 +200,53 @@ public:
                 res.buf.createAndMap(*this, numActors);
 
                 // create the descriptor set
-                createDescriptorSet(actorsDescriptorSetLayout, actorsDescriptorPool, res.descriptorSet);
-                VulkDescriptorSetUpdater descriptorSetUpdater(res.descriptorSet);
-                descriptorSetUpdater.addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0);
-                descriptorSetUpdater.addImageSampler(textureImageView, textureSampler, 1);
-                descriptorSetUpdater.addStorageBuffer(res.buf.buf, sizeof(ActorSSBOElt) * numActors, 2);
-                descriptorSetUpdater.update(device);
+                res.descriptorSet = createDescriptorSet(actorsDescriptorSetLayout, actorsDescriptorPool);
+                VulkDescriptorSetUpdater(res.descriptorSet)
+                    .addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0)
+                    .addImageSampler(textureImageView, textureSampler, 1)
+                    .addStorageBuffer(res.buf.buf, sizeof(ActorSSBOElt) * numActors, 2)
+                    .update(device);
             }
         }
 
         // waves
-        // wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
-        //     .addUniformBuffer(0)
-        //     .build(*this);
-        // wavesDescriptorPool = VulkDescriptorPoolBuilder()
-        //     .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
-        //     .build(device);
-        // createDescriptorSet(wavesDescriptorSetLayout, actorsDescriptorPool, wavesDescriptorSet);
-        // VulkDescriptorSetUpdater wavesDescriptorSetUpdater(wavesDescriptorSet);
-        // wavesDescriptorSetUpdater.update(device);
-        // createDescriptorSet(wavesDescriptorSetLayout, actorsDescriptorPool, wavesDescriptorSet);
+        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+            .addUniformBuffer(0)
+            .build(*this);
+        wavesDescriptorPool = VulkDescriptorPoolBuilder()
+            .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
+            .build(device);
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            wavesDescriptorSets[i] = createDescriptorSet(wavesDescriptorSetLayout, wavesDescriptorPool);
+            VulkDescriptorSetUpdater(wavesDescriptorSets[i])
+                .addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0)
+                .update(device);
+        }
+        VulkPipelineBuilder(*this)
+            .addVertexShaderStage("Assets/Shaders/Vert/waves.spv")
+            .addVertexInputBindingDescription(0,sizeof(Vertex))
+            .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
+            .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
+            .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
+            .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
+            .addFragmentShaderStage("Assets/Shaders/Frag/waves.spv")
+            .build(wavesDescriptorSetLayout, wavesPipelineLayout, wavesGraphicsPipeline);
     }
 
 private:
+    VkDescriptorSet createDescriptorSet(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool) {
+        VkDescriptorSetLayout layouts[] = { descriptorSetLayout };
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = layouts;
+
+        VkDescriptorSet descriptorSet;
+        VK_CALL(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+        return descriptorSet;
+    }
+
 
     void updateUniformBuffer(UniformBufferObject &ubo) {
         static auto startTime = std::chrono::high_resolution_clock::now();

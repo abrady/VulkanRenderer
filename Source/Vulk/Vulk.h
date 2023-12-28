@@ -51,6 +51,7 @@ public:
     }
 public:
     VkDevice device;
+    VkRenderPass renderPass;
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     void copyFromMemToBuffer(void const *srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -59,7 +60,6 @@ public:
     VkImage createTextureImage(char const *texture_path, VkDeviceMemory& textureImageMemory, VkImage& textureImage);
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     VkShaderModule createShaderModule(const std::vector<char>& code);
-    void createDescriptorSet(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, VkDescriptorSet& descriptorSet);
 protected:
     virtual void init() = 0;
     virtual void drawFrame(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer) = 0;
@@ -69,7 +69,6 @@ protected:
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
-    VkRenderPass renderPass;
     VkExtent2D swapChainExtent;
     uint32_t currentFrame = 0;
     virtual void handleEvents() {

@@ -47,7 +47,7 @@ VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputFieldVec2(uint32_t bindi
     return addVertexInputField(binding, location, offset, VK_FORMAT_R32G32_SFLOAT);
 }
 
-void VulkPipelineBuilder::build(VkRenderPass renderPass, VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout &pipelineLayout, VkPipeline &graphicsPipeline)
+void VulkPipelineBuilder::build(VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout &pipelineLayout, VkPipeline &graphicsPipeline)
 {
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -124,7 +124,7 @@ void VulkPipelineBuilder::build(VkRenderPass renderPass, VkDescriptorSetLayout d
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = pipelineLayout;
-    pipelineInfo.renderPass = renderPass;
+    pipelineInfo.renderPass = vk.renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 

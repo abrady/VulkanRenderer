@@ -155,17 +155,6 @@ VkShaderModule Vulk::createShaderModule(const std::vector<char> &code)
     return shaderModule;
 }
 
-void Vulk::createDescriptorSet(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, VkDescriptorSet& descriptorSet) {
-    VkDescriptorSetLayout layouts[] = { descriptorSetLayout };
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = layouts;
-
-    VK_CALL(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
-}
-
 VkSampler Vulk::createTextureSampler()
 {
     VkPhysicalDeviceProperties properties{};

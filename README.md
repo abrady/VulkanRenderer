@@ -29,6 +29,7 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # TODOs
 * I've been sloppy naming structs: MeshRender, MeshRenderInfo, MeshFrameResources: make this more coherent
+* why does each actor's mesh need its own descriptorset again?
 
 # Log
 
