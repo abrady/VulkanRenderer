@@ -111,11 +111,8 @@ class LandAndWaves : public Vulk {
     VkDescriptorPool wavesDescriptorPool;
     VkDescriptorSetLayout wavesDescriptorSetLayout;
     std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> wavesDescriptorSets;
-    VulkMesh waves;
+    VulkMesh wavesMesh;
     MeshRender wavesRender;
-    VkBuffer wavesVertexBuffer;
-    VkBuffer wavesIndexBuffer;
-
 
     struct MeshAccumulator {
         std::vector<Vertex> vertices;
@@ -172,10 +169,8 @@ public:
             {{"terrain0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
         };
 
-        makeGrid(160, 160, 50, 50, waves);
 
         actorsRender.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
-        wavesRender.init(*this, waves.vertices, waves.indices);
 
         createTextureImage("Assets/Textures/uv_checker.png", textureImageMemory, textureImage);
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -188,8 +183,7 @@ public:
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
             .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
-            .build(device);
-
+            .build(device, MAX_FRAMES_IN_FLIGHT * numMeshes);
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
@@ -209,13 +203,18 @@ public:
             }
         }
 
+        //////////////////////////////////////////////////////////////////////////
         // waves
+        
+        makeGrid(160, 160, 50, 50, wavesMesh);
+        wavesRender.init(*this, wavesMesh.vertices, wavesMesh.indices);
+
         wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(0)
             .build(*this);
         wavesDescriptorPool = VulkDescriptorPoolBuilder()
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
-            .build(device);
+            .build(device, MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             wavesDescriptorSets[i] = createDescriptorSet(wavesDescriptorSetLayout, wavesDescriptorPool);
             VulkDescriptorSetUpdater(wavesDescriptorSets[i])
@@ -307,9 +306,8 @@ private:
         scissor.extent = swapChainExtent;
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        VkBuffer vertexBuffers[] = { actorsRender.vertexBuffer, wavesRender.vertexBuffer };
-        VkDeviceSize offsets[] = { 0, 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &actorsRender.vertexBuffer, offsets);
 
         vkCmdBindIndexBuffer(commandBuffer, actorsRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
@@ -320,9 +318,14 @@ private:
             vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
         }
 
-        // vkCmdBindIndexBuffer(commandBuffer, wavesRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        // vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &wavesDescriptorSet, 0, nullptr);
-        // vkCmdDrawIndexed(commandBuffer, (uint32_t)waves.indices.size(), 1, 0, 0, 0);
+        // waves
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender.vertexBuffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, wavesRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
+        vkCmdDrawIndexed(commandBuffer, 0, (uint32_t)wavesMesh.indices.size(), 0, 0, 0);
 
         vkCmdEndRenderPass(commandBuffer);
 
@@ -352,6 +355,9 @@ private:
         actorsRender.cleanup(*this);
 
         vkDestroyDescriptorSetLayout(device, wavesDescriptorSetLayout, nullptr);
+        vkDestroyDescriptorPool(device, wavesDescriptorPool, nullptr);
+        vkDestroyPipeline(device, wavesGraphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, wavesPipelineLayout, nullptr);
         wavesRender.cleanup(*this);
     }
 
