@@ -138,23 +138,6 @@ class LandAndWaves : public Vulk {
 
 public:
     void init() override {
-        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
-            .addUniformBuffer(0)
-            .addSampler(1)
-            .addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT)
-            .build(*this);
-
-        VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/terrain.spv")
-            .addVertexInputBindingDescription(0, sizeof(Vertex))
-            .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
-            .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
-            .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
-            .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/terrain.spv")
-            .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
-
-
         camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
 
         VulkMesh terrain;
@@ -163,21 +146,44 @@ public:
             v.pos.y = getTerrainHeight(v);
         }
 
-        VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
-        meshActors["terrain"] = {
-            meshAccumulator.appendMesh(terrain),
-            {{"terrain0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
-        };
-
-
-        actorsRender.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
-
         createTextureImage("Assets/Textures/uv_checker.png", textureImageMemory, textureImage);
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
         textureSampler = createTextureSampler();
         for (auto &ubo: ubos) {
             ubo.createUniformBuffers(*this);
         }
+
+        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+            .addUniformBuffer(0)
+            .addSampler(1)
+            .addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT)
+            .build(*this);
+
+        VulkPipelineBuilder(*this)
+            .addVertexShaderStage("Assets/Shaders/Vert/model.spv")
+            .addVertexInputBindingDescription(0, sizeof(Vertex))
+            .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
+            .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
+            .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
+            .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
+            .addFragmentShaderStage("Assets/Shaders/Frag/model.spv")
+            .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
+
+        VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
+        meshActors["terrain"] = {
+            meshAccumulator.appendMesh(terrain),
+            {{"terrain0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
+        };
+
+        // VulkMesh temp;
+        // makeGrid(160, 160, 50, 50, temp);
+        // meshActors["temp"] = {
+        //     meshAccumulator.appendMesh(temp),
+        //     {{"temp0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
+        // };
+
+
+        actorsRender.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
         uint32_t numMeshes = static_cast<uint32_t>(meshActors.size());
         actorsDescriptorPool = VulkDescriptorPoolBuilder()
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
@@ -211,25 +217,33 @@ public:
 
         wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(0)
+            .addSampler(1)
+            .addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT)
             .build(*this);
-        wavesDescriptorPool = VulkDescriptorPoolBuilder()
-            .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
-            .build(device, MAX_FRAMES_IN_FLIGHT);
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            wavesDescriptorSets[i] = createDescriptorSet(wavesDescriptorSetLayout, wavesDescriptorPool);
-            VulkDescriptorSetUpdater(wavesDescriptorSets[i])
-                .addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0)
-                .update(device);
-        }
+
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/waves.spv")
+            .addVertexShaderStage("Assets/Shaders/Vert/model.spv")
             .addVertexInputBindingDescription(0,sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/waves.spv")
+            .addFragmentShaderStage("Assets/Shaders/Frag/model.spv")
             .build(wavesDescriptorSetLayout, wavesPipelineLayout, wavesGraphicsPipeline);
+
+        wavesDescriptorPool = VulkDescriptorPoolBuilder()
+            .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
+            .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
+            .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT)
+            .build(device, MAX_FRAMES_IN_FLIGHT);
+
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            wavesDescriptorSets[i] = createDescriptorSet(wavesDescriptorSetLayout, wavesDescriptorPool);
+            VulkDescriptorSetUpdater(wavesDescriptorSets[i])
+                .addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0)
+                .addImageSampler(textureImageView, textureSampler, 1)
+                .update(device);
+        }
     }
 
 private:
@@ -288,10 +302,6 @@ private:
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
 
-        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsGraphicsPipeline);
-
         VkViewport viewport{};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
@@ -299,24 +309,14 @@ private:
         viewport.height = (float)swapChainExtent.height;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
         VkRect2D scissor{};
         scissor.offset = { 0, 0 };
         scissor.extent = swapChainExtent;
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
         VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &actorsRender.vertexBuffer, offsets);
 
-        vkCmdBindIndexBuffer(commandBuffer, actorsRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-        for (auto &meshActor: meshActors) {
-            MeshRenderInfo &meshRenderInfo = meshActor.second;
-            MeshFrameResources &res = meshRenderInfo.meshRenderData[currentFrame];
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &res.descriptorSet, 0, nullptr);
-            vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
-        }
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         // waves
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
@@ -325,7 +325,22 @@ private:
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender.vertexBuffer, offsets);
         vkCmdBindIndexBuffer(commandBuffer, wavesRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
-        vkCmdDrawIndexed(commandBuffer, 0, (uint32_t)wavesMesh.indices.size(), 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, (uint32_t)wavesMesh.indices.size(), 1, 0, 0, 0);
+
+        // actors
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsGraphicsPipeline);
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &actorsRender.vertexBuffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, actorsRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+        for (auto &meshActor: meshActors) {
+            MeshRenderInfo &meshRenderInfo = meshActor.second;
+            MeshFrameResources &res = meshRenderInfo.meshRenderData[currentFrame];
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &res.descriptorSet, 0, nullptr);
+            vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
+        }
 
         vkCmdEndRenderPass(commandBuffer);
 

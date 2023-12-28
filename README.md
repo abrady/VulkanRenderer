@@ -49,6 +49,11 @@ Notes:
             * use the same ubo as the actor pipeline
             * bind the same vertex description as well
         * render
+* waves are not showing up, hmm.
+    * swapping render order and the hils still show up
+    * adding the waves mesh to the actors and it shows up
+    * it must be something about the index or vertex buffers...
+    * oh good lord, I was passing 0 for the number of indices to draw in vkCmdDrawIndexed and the number of indices was being passed as the number of instances. intellisense might be nice to have working...
 
 ## 12/26
 * render the waves
