@@ -33,6 +33,11 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 12/28
+![Alt text](Assets/Screenshots/basic_waves.png)
+* yay working
+* basically this updates the buffer each frame
+
 ## 12/27
 * render the waves
 * dynamically update the waves

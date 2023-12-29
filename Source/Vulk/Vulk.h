@@ -70,7 +70,7 @@ protected:
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
     VkExtent2D swapChainExtent;
-    uint32_t currentFrame = 0;
+    uint32_t currentFrame = 0; // index of the current frame in flight, always between 0 and MAX_FRAMES_IN_FLIGHT
     virtual void handleEvents() {
         // override this to call things like glfwGetKey and glfwGetMouseButton
     }

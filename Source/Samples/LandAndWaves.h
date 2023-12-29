@@ -86,11 +86,17 @@ class LandAndWaves : public Vulk {
         void init(Vulk &vk, std::vector<Vertex> const &vertices, std::vector<uint32_t> const &indices) {
             VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();    
             vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+            bufferSize = sizeof(indices[0]) * indices.size();
+            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+            copyToBuffer(vk, vertices, indices);
+        }
+
+        void copyToBuffer(Vulk &vk, std::vector<Vertex> const &vertices, std::vector<uint32_t> const &indices) {
+            VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();    
             vk.copyFromMemToBuffer(vertices.data(), vertexBuffer, bufferSize);
 
             bufferSize = sizeof(indices[0]) * indices.size();
-            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-            vk.copyFromMemToBuffer(indices.data(), indexBuffer, bufferSize); 
+            vk.copyFromMemToBuffer(indices.data(), indexBuffer, bufferSize);
         }
 
         void cleanup(Vulk &vk) {
@@ -112,7 +118,7 @@ class LandAndWaves : public Vulk {
     VkDescriptorSetLayout wavesDescriptorSetLayout;
     std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> wavesDescriptorSets;
     VulkMesh wavesMesh;
-    MeshRender wavesRender;
+    std::array<MeshRender, MAX_FRAMES_IN_FLIGHT> wavesRender;
 
     struct MeshAccumulator {
         std::vector<Vertex> vertices;
@@ -175,7 +181,7 @@ public:
             {{"terrain0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
         };
 
-        // VulkMesh temp;;plo0-[]
+        // VulkMesh temp;
         // makeGrid(160, 160, 50, 50, temp);
         // meshActors["temp"] = {
         //     meshAccumulator.appendMesh(temp),
@@ -212,7 +218,9 @@ public:
         // waves
         
         makeGrid(160, 160, 50, 50, wavesMesh);
-        wavesRender.init(*this, wavesMesh.vertices, wavesMesh.indices);
+        for (auto &render: wavesRender) {
+            render.init(*this, wavesMesh.vertices, wavesMesh.indices);
+        }
 
         wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(0)
@@ -274,7 +282,21 @@ private:
         ubo.proj[1][1] *= -1;
     }
 
+    void wavesTick() {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        for (auto &v : wavesMesh.vertices) {
+            v.pos.y = 0.05f * (v.pos.z * sinf(0.1f * v.pos.x + time) + v.pos.x * cosf(0.1f * v.pos.z + time));
+        }
+
+        // update the buffer
+        wavesRender[(currentFrame + 1) % MAX_FRAMES_IN_FLIGHT].copyToBuffer(*this, wavesMesh.vertices, wavesMesh.indices);
+    }
+
     void drawFrame(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer) override {
+        wavesTick();
         updateUniformBuffer(*ubos[currentFrame].mappedUBO);
         for (auto &meshActor : meshActors) {
            meshActor.second.updateActorSSBO(currentFrame);
@@ -319,8 +341,8 @@ private:
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender.vertexBuffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, wavesRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender[currentFrame].vertexBuffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, wavesRender[currentFrame].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
         vkCmdDrawIndexed(commandBuffer, (uint32_t)wavesMesh.indices.size(), 1, 0, 0, 0);
 
@@ -370,7 +392,9 @@ private:
         vkDestroyDescriptorPool(device, wavesDescriptorPool, nullptr);
         vkDestroyPipeline(device, wavesGraphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, wavesPipelineLayout, nullptr);
-        wavesRender.cleanup(*this);
+        for (auto &render : wavesRender) {
+            render.cleanup(*this);
+        }
     }
 
     void handleEvents() override {
