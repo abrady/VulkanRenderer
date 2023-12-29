@@ -33,6 +33,37 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 12/28 Lighting
+* yay, onto the next level
+
+A simplified lighting model has three components:
+* Specular
+* Diffuse
+* Ambient
+
+Diffuse:
+* Lighting vectors:
+    * E is the eye vector
+    * p is a point visible to the eye
+    * v = Norm(E - p) is the unit vector from the eye to p
+    * L is the unit light vector pointing in the opposite direction 
+    * r = -v, the reflection vector
+
+For diffuse lighting we'll use Lambert's cosine law. Lambert's Cosine Law can be expressed mathematically as:
+I = I0 * cos(theta)
+where:
+* I is the intensity of the light observed,
+* I0 is the intensity when the light is perpendicular to the surface (at
+theta = 0 degrees)
+* Theta is tngle of incidence
+
+In terms of vector math we can just say:
+* I = I0(N . L)
+
+we don't want to add light when it hits from behind, so put a max term in this:
+* I = max(I0(N . L), 0)
+
+
 ## 12/28
 ![Alt text](Assets/Screenshots/basic_waves.png)
 * yay working
