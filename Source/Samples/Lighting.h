@@ -7,62 +7,30 @@
 #include "Vulk/VulkPipelineBuilder.h"
 #include "Vulk/VulkDescriptorPoolBuilder.h"
 
-class LandAndWaves : public Vulk {
+class Lighting : public Vulk {
+    template<typename T>
+    struct MappedSSBO {
+        VkBuffer buf;
+        VkDeviceMemory mem;
+        T* mappedObjs; // contiguous array of memory mapped actor instance info
+
+        void createAndMap(Vulk &vk, uint32_t numActors) {
+            VkDeviceSize bufferSize = sizeof(T) * numActors;
+            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buf, mem);
+            vkMapMemory(vk.device, mem, 0, bufferSize, 0, (void**)&mappedObjs);
+        }
+        void cleanup(VkDevice dev) {
+            vkDestroyBuffer(dev, buf, nullptr);
+            vkFreeMemory(dev, mem, nullptr);
+        }        
+    };
+
     struct UniformBufferObject {
         alignas(16) glm::mat4 world;
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
     };
     VulkCamera camera;
-
-    struct ActorSSBOElt {
-        glm::mat4 xform;
-    };
-
-    struct ActorSSBO {
-        VkBuffer buf;
-        VkDeviceMemory mem;
-        ActorSSBOElt* mappedActorElts; // contiguous array of memory mapped actor instance info
-
-        void createAndMap(Vulk &vk, uint32_t numActors) {
-            VkDeviceSize bufferSize = sizeof(ActorSSBOElt) * numActors;
-            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buf, mem);
-            vkMapMemory(vk.device, mem, 0, bufferSize, 0, (void**)&mappedActorElts);
-        }
-        void cleanup(VkDevice dev) {
-            vkDestroyBuffer(dev, buf, nullptr);
-            vkFreeMemory(dev, mem, nullptr);
-        }
-    };
-
-    struct MeshFrameResources {
-        VkDescriptorSet descriptorSet;
-        ActorSSBO buf;
-
-        void cleanup(VkDevice dev) {
-            buf.cleanup(dev);
-        }
-    };
-    struct MeshRenderInfo {
-        VulkMeshRef meshRef; // what we're drawing
-        std::vector<VulkActor> actors; // the actors that use this mesh
-        std::array<MeshFrameResources, MAX_FRAMES_IN_FLIGHT> meshRenderData; // the per-frame data
-        void updateActorSSBO(uint32_t curFrame) {
-            MeshFrameResources &res = meshRenderData[curFrame];
-            for (int i = 0; i < actors.size(); i++) {
-                ActorSSBOElt ubo{};
-                ubo.xform = actors[i].xform;
-                res.buf.mappedActorElts[i] = ubo;
-            }
-        }
-        void cleanup(VkDevice dev) {
-            for (auto &res : meshRenderData) {
-                res.cleanup(dev);
-            }
-        }
-    };
-    VkDescriptorPool actorsDescriptorPool;
-    std::unordered_map<char const *, MeshRenderInfo> meshActors;
 
     struct UBO {
         VkBuffer buf;
@@ -75,6 +43,31 @@ class LandAndWaves : public Vulk {
         }
     };
     std::array<UBO, MAX_FRAMES_IN_FLIGHT> ubos;
+
+    struct ActorSSBOElt {
+        glm::mat4 xform;
+    };
+
+    struct MeshRenderInfo {
+        VulkMeshRef meshRef; // what we're drawing
+        std::vector<VulkActor> actors; // the actors that use this mesh
+        std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets; // the per-frame descriptor sets
+        std::array<MappedSSBO<ActorSSBOElt>, MAX_FRAMES_IN_FLIGHT> ssbos; // the per-frame actor xforms
+        void updateActorSSBO(uint32_t curFrame) {
+            auto &res = ssbos[curFrame];
+            for (int i = 0; i < actors.size(); i++) {
+                res.mappedObjs[i].xform = actors[i].xform;
+            }
+        }
+        void cleanup(VkDevice dev) {
+            for (auto &res : ssbos) {
+                res.cleanup(dev);
+            }
+        }
+    };
+    
+    VkDescriptorPool actorsDescriptorPool;
+    std::unordered_map<char const *, MeshRenderInfo> meshActors;
 
     struct MeshRender {
         VkBuffer vertexBuffer;
@@ -112,14 +105,6 @@ class LandAndWaves : public Vulk {
     VkPipelineLayout actorsPipelineLayout;
     VkPipeline actorsGraphicsPipeline;
 
-    VkPipelineLayout wavesPipelineLayout;
-    VkPipeline wavesGraphicsPipeline;
-    VkDescriptorPool wavesDescriptorPool;
-    VkDescriptorSetLayout wavesDescriptorSetLayout;
-    std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> wavesDescriptorSets;
-    VulkMesh wavesMesh;
-    std::array<MeshRender, MAX_FRAMES_IN_FLIGHT> wavesRender;
-
     struct MeshAccumulator {
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
@@ -142,15 +127,31 @@ class LandAndWaves : public Vulk {
         return 0.3f * (v.pos.z * sinf(0.1f * v.pos.x) + v.pos.x * cosf(0.1f * v.pos.z));
     }
 
+    struct Material {
+        glm::vec4 diffuse;
+        glm::vec3 fresnelR0;
+        float roughness;
+    };
+    Material material = {
+        {1.0f, 1.0f, 1.0f, 1.f},
+        {0.01f, 0.01f, 0.01f},
+        0.5f
+    };
+    MappedSSBO<Material> materialsSSBO;
+
+    struct Light {
+        glm::vec4 pos;
+        glm::vec4 color;
+    };
+    Light light = {
+        {0.0f, 100.0f, 0.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f, 1.0f}
+    };
+    MappedSSBO<Light> lightsSSBO;
+
 public:
     void init() override {
-        camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
-
-        VulkMesh terrain;
-        makeGrid(160, 160, 50, 50, terrain);
-        for (auto &v : terrain.vertices) {
-            v.pos.y = getTerrainHeight(v);
-        }
+        camera.lookAt(glm::vec3(0.f, 1.f, 2.f), glm::vec3(0.f, 0.f, 0.f));
 
         createTextureImage("Assets/Textures/uv_checker.png", textureImageMemory, textureImage);
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -160,25 +161,29 @@ public:
         }
 
         actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
-            .addUniformBuffer(0)
-            .addSampler(1)
-            .addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT)
+            .addUniformBuffer(VulkShaderBinding_UBO)
+            .addSampler(VulkShaderBinding_Sampler)
+            .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_VERTEX_BIT)
+            .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(*this);
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/terrain.spv")
+            .addVertexShaderStage("Assets/Shaders/Vert/light.spv")
             .addVertexInputBindingDescription(0, sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/terrain.spv")
+            .addFragmentShaderStage("Assets/Shaders/Frag/light.spv")
             .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
 
-        VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
-        meshActors["terrain"] = {
-            meshAccumulator.appendMesh(terrain),
-            {{"terrain0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
+        VulkMesh sphere;
+        makeGeoSphere(1.f, 3, sphere);
+        VulkMeshRef sphereRef = meshAccumulator.appendMesh(sphere);
+        meshActors["sphere"] = {
+            meshAccumulator.appendMesh(sphere),
+            {{"sphere0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
         };
 
         actorsRender.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
@@ -186,62 +191,35 @@ public:
         actorsDescriptorPool = VulkDescriptorPoolBuilder()
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
-            .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
+            .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes * 3)
             .build(device, MAX_FRAMES_IN_FLIGHT * numMeshes);
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
             uint32_t numActors = static_cast<uint32_t>(meshRenderInfo.actors.size());
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-                MeshFrameResources &res = meshRenderInfo.meshRenderData[i];
                 // map the actor xforms into a mem-mapped SSBO
-                res.buf.createAndMap(*this, numActors);
+                meshRenderInfo.ssbos[i].createAndMap(*this, numActors);
 
                 // create the descriptor set
-                res.descriptorSet = createDescriptorSet(actorsDescriptorSetLayout, actorsDescriptorPool);
-                VulkDescriptorSetUpdater(res.descriptorSet)
+                meshRenderInfo.descriptorSets[i] = createDescriptorSet(actorsDescriptorSetLayout, actorsDescriptorPool);
+                VulkDescriptorSetUpdater(meshRenderInfo.descriptorSets[i])
                     .addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0)
                     .addImageSampler(textureImageView, textureSampler, 1)
-                    .addStorageBuffer(res.buf.buf, sizeof(ActorSSBOElt) * numActors, 2)
+                    .addStorageBuffer(meshRenderInfo.ssbos[i].buf, sizeof(ActorSSBOElt) * numActors, VulkShaderBinding_Actors)
+                    .addStorageBuffer(lightsSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
+                    .addStorageBuffer(materialsSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
                     .update(device);
             }
         }
 
-        //////////////////////////////////////////////////////////////////////////
-        // waves
-        
-        makeGrid(160, 160, 50, 50, wavesMesh);
-        for (auto &render: wavesRender) {
-            render.init(*this, wavesMesh.vertices, wavesMesh.indices);
-        }
+        // create the materials SSBO
+        materialsSSBO.createAndMap(*this, 1);
+        materialsSSBO.mappedObjs[0] = material;
 
-        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
-            .addUniformBuffer(0)
-            .addSampler(1)
-            .build(*this);
-
-        VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/waves.spv")
-            .addVertexInputBindingDescription(0,sizeof(Vertex))
-            .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
-            .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
-            .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
-            .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/waves.spv")
-            .build(wavesDescriptorSetLayout, wavesPipelineLayout, wavesGraphicsPipeline);
-
-        wavesDescriptorPool = VulkDescriptorPoolBuilder()
-            .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
-            .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
-            .build(device, MAX_FRAMES_IN_FLIGHT);
-
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            wavesDescriptorSets[i] = createDescriptorSet(wavesDescriptorSetLayout, wavesDescriptorPool);
-            VulkDescriptorSetUpdater(wavesDescriptorSets[i])
-                .addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0)
-                .addImageSampler(textureImageView, textureSampler, 1)
-                .update(device);
-        }
+        // create the lights SSBO
+        lightsSSBO.createAndMap(*this, 1);
+        lightsSSBO.mappedObjs[0] = light;
     }
 
 private:
@@ -275,21 +253,7 @@ private:
         ubo.proj[1][1] *= -1;
     }
 
-    void wavesTick() {
-        static auto startTime = std::chrono::high_resolution_clock::now();
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-        for (auto &v : wavesMesh.vertices) {
-            v.pos.y = 0.05f * (v.pos.z * sinf(0.1f * v.pos.x + time) + v.pos.x * cosf(0.1f * v.pos.z + time));
-        }
-
-        // update the buffer
-        wavesRender[(currentFrame + 1) % MAX_FRAMES_IN_FLIGHT].copyToBuffer(*this, wavesMesh.vertices, wavesMesh.indices);
-    }
-
     void drawFrame(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer) override {
-        wavesTick();
         updateUniformBuffer(*ubos[currentFrame].mappedUBO);
 
         VkCommandBufferBeginInfo beginInfo{};
@@ -327,15 +291,6 @@ private:
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        // waves
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender[currentFrame].vertexBuffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, wavesRender[currentFrame].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
-        vkCmdDrawIndexed(commandBuffer, (uint32_t)wavesMesh.indices.size(), 1, 0, 0, 0);
-
         // actors
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsGraphicsPipeline);
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -346,9 +301,8 @@ private:
 
         for (auto &meshActor: meshActors) {
             MeshRenderInfo &meshRenderInfo = meshActor.second;
-            meshRenderInfo.updateActorSSBO(currentFrame); // is this safe? need to understand synchroniation better...
-            MeshFrameResources &res = meshRenderInfo.meshRenderData[currentFrame];
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &res.descriptorSet, 0, nullptr);
+            meshRenderInfo.updateActorSSBO(currentFrame); // is this safe? need to understand synchroniation better...;
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &meshRenderInfo.descriptorSets[currentFrame], 0, nullptr);
             vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
         }
 
@@ -378,18 +332,8 @@ private:
         vkDestroyImage(device, textureImage, nullptr);
         vkFreeMemory(device, textureImageMemory, nullptr);
         actorsRender.cleanup(*this);
-
-        vkDestroyDescriptorSetLayout(device, wavesDescriptorSetLayout, nullptr);
-        vkDestroyDescriptorPool(device, wavesDescriptorPool, nullptr);
-        vkDestroyPipeline(device, wavesGraphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, wavesPipelineLayout, nullptr);
-        for (auto &render : wavesRender) {
-            render.cleanup(*this);
-        }
-    }
-
-    void handleEvents() override {
-        // override this to call things like glfwGetKey and glfwGetMouseButton
+        materialsSSBO.cleanup(device);
+        lightsSSBO.cleanup(device);
     }
 
     void keyCallback(int key, int scancode, int action, int mods) {

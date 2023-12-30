@@ -47,6 +47,15 @@ do { \
     } \
 } while (0)
 
+enum VulkShaderBindings {
+    VulkShaderBinding_UBO = 0,
+    VulkShaderBinding_Sampler = 1,
+    VulkShaderBinding_Actors = 2,
+    VulkShaderBinding_Lights = 3,
+    VulkShaderBinding_Materials = 4,
+    VulkShaderBinding_NumBindings = 5,
+};
+
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;

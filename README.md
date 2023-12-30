@@ -29,27 +29,43 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # TODOs
 * I've been sloppy naming structs: MeshRender, MeshRenderInfo, MeshFrameResources: make this more coherent
-* why does each actor's mesh need its own descriptorset again?
+* tests for lighting? I'm vaguely nervous about math errors and having something that looks fine to my untrained eye but is actually wrong.
+* it feels like the descriptor set layout could inform the descriptor pool allocator...
 
 # Log
 
-## 12/28 Lighting
+## 12/29 Lighting
 * yay, onto the next level
+* now that I've read about lighting and made some notes below. what next?
+    1. define a material, we need the ambient and diffuse properties at least
+    2. we need a light as well, probably pass these in using an SSBO
+    3. let's do a sphere or a plane first and see how it looks. maybe hold the light constant while the eye moves.
+    4. let's also just do one material for the whole thing, we'll do texture mapping next
 
-A simplified lighting model has three components:
-* Specular
-* Diffuse
-* Ambient
+Notes:
+* hmm, how do normals get handled when transformed? can I just rotate them?
+    * I see that I should use fragNormal = mat3(transpose(inverse(worldMat))) * inNormal
+    * why is that? apprently because we need n' . v' to be 0 where v' = worldMat*v and n' = that inverse transpose thing above. 
+    * why? ah, I see n' * Mv = 0
+    * so Nn * Mv = 0
+    * so n_tN*Mv = 0
+    * blah blah, matrix math N needs to be the inverse transposed so that we get n_t*I*v = 0
+    * but wait, if worldMat is a pure rotation matrix then the transpose is the inverse so transpose(inverse(worldMat)) = worldMat
+    * so I ~can~ just rotate normals by the worldMat *sigh* overthinking is my worst enemy
 
-Diffuse:
-* Lighting vectors:
-    * E is the eye vector
-    * p is a point visible to the eye
-    * v = Norm(E - p) is the unit vector from the eye to p
-    * L is the unit light vector pointing in the opposite direction 
-    * r = -v, the reflection vector
+## 12/28 Lighting
 
-For diffuse lighting we'll use Lambert's cosine law. Lambert's Cosine Law can be expressed mathematically as:
+### Lighting vectors:
+* E is the eye vector
+* p is a point visible to the eye
+* v = Norm(E - p) is the unit vector from the eye to p
+* L is the unit light vector pointing in the opposite direction 
+* r = -v, the reflection vector
+
+
+### Lambert's cosine law. 
+
+Lambert's Cosine Law can be expressed mathematically as:
 I = I0 * cos(theta)
 where:
 * I is the intensity of the light observed,
@@ -61,8 +77,94 @@ In terms of vector math we can just say:
 * I = I0(N . L)
 
 we don't want to add light when it hits from behind, so put a max term in this:
-* I = max(I0(N . L), 0)
+* I = I0*max(N . L, 0)
 
+### A simplified lighting model has three components:
+* Diffuse : how light is colored by the material as it bounces around inside it and comes out.
+* Ambient : indirect light
+* Specular: how light is colored by the shininess of the material
+
+#### Diffuse
+Diffuse light models how light may enter a material, bounce around and exit.
+
+Two parts:
+1. the first part has the light color, and the *diffuse albedo* color, which specifies the diffuse reflectance. you get this by multiplying the RGB components together
+    * let's say you had a light B = (.8, .8, .8) and a diffuse albedo at a point m_d = (.5, 1, .75) then the amount of diffuse light reflected would be
+        * B⊗m_d = (.4, .8, .6)
+2. Now that we have the intensity of the light, multiply this value by our lambertian and you get the full equation: c_d = B⊗m_d*max(N . L, 0)
+
+#### Ambient
+Ambient is a hack to approximate indirect light that exists in the real world. we just use the diffuse material information for this and combine it with a global ambient light value:
+* c_a = A_l⊗m_d 
+
+#### Specular
+The Fresnel effect is where when light reaches the intersection of two media with different indices of refraction, some of that light is reflected, and some is refracted. we call this 'specular reflection'
+* let 0<= R_f <= 1 be the amount of reflected light
+* (1-R_f) is the amount of refracted light (by conservation of energy)
+
+##### Schlick's Approximation:
+Christoph Schlick proposed a simple approximation formula for the Fresnel factor:
+* F(θ) = F_0 + (1 - F_0)(1 - cos(θ))^5
+
+Where:
+* F(θ) is the resulting reflection
+* F_0 is the head-on full reflectence which is calculated from the refractance of the material
+* cos(θ) is the angle between the surface normal and the light
+
+We can turn this into:
+* F(θ) = F_0 + (1 - F_0)(1 - N.v)^5
+
+Some F_0 values:
+* Gold: (1.00, 0.71, 0.29)
+* Copper: (0.95, 0.64, 0.54)
+* Aluminum: (0.91, 0.92, 0.92)
+* Silver: (0.97, 0.96, 0.91)
+* Water (non-chlorinated): (0.02, 0.02, 0.02)
+* Glass (typical): (0.04, 0.04, 0.04)
+* Plastic (average): (0.03, 0.03, 0.03)
+* Wood (varies greatly): (0.03, 0.02, 0.01)
+* Skin: (0.03, 0.02, 0.02)
+* Concrete: (0.04, 0.04, 0.04)
+* Asphalt: (0.05, 0.05, 0.05)
+
+##### Roughness, BRDF and the *microfacet* model
+Objects in the real world aren't smooth mirrors, to model this we use the *microfacet* model.
+
+For a given light L and a given view v, we want to know what portion of microfacets reflect towards v
+* Define H = normalize(L+V) as the halfway vector between the light and the vector to the viewer
+
+The Bidirectional Reflectance Distribution Function (BRDF) describes how light reflects at an opaque surface. In the context of microfacet models:
+* The D term (Distribution) is particularly relevant here. It describes the distribution of microfacets. A common distribution function used is the GGX/Trowbridge-Reitz distribution, which accounts for varying roughness.
+* The specular BRDF often includes a term that involves the dot product of H and the normal N, reflecting the alignment of microfacets with the halfway vector.
+* D = n.h is popular as it is easy to model
+
+We can then model this as follows:
+* let m be the model's 'roughness', where lower values are 'rougher' and higher are smoother
+* F_h(θ) = (m + 8)/8(n.h)^m
+   * the m+8/8 is some voodoo that approximates light conservation, probably due to the exponentiation of the cos which is in [0,1]
+
+##### Putting it all together: The complete specular equation
+Given:
+* L: is the light vector
+* v: the view direction
+* h: is the normal at which microfacets reflect light towards the viewer
+* a_h: is the angle between h and L
+
+Then:
+* R_f(a_h) is the amount of light reflected towards the viewer due to surface roughness
+* S(θ_h) tells us how much light reflected towards the viewer for a given facet due to fresnel effect
+* and max(L.n,0) is just the quantity of incoming light (again, if striking from behind we want this to be zero)
+
+So:
+* c_s = max(L.n,0)S(θ_h)R_f(a_h)
+* c_s = max(L.n,0)B⊗[F_0 + (1 - F_0)(1 - N.v)^5][(m + 8)/8(n.h)^m]
+
+#### Our Full Lighting Equation
+Combining our c_a + c_d + c_s we get:
+* c_a + c_d + c_s = A_l⊗m_d + B⊗m_d*max(N . L, 0) + max(L.n,0)B⊗[F_0 + (1 - F_0)(1 - N.v)^5][(m + 8)/8(n.h)^m]
+
+But we can simplify a little as specular and diffuse both use the max(...)B⊗
+* c_a + c_d + c_s = A_l⊗m_d + B⊗max(N . L, 0){m_d* + [F_0 + (1 - F_0)(1 - N.v)^5](m + 8)/8(n.h)^m}
 
 ## 12/28
 ![Alt text](Assets/Screenshots/basic_waves.png)
@@ -210,3 +312,10 @@ https://github.com/SaschaWillems/Vulkan/blob/master/examples/instancing/instanci
 
 Three geos rendering in one big vertex and index buffer. next I'd like to treat these as models that I load once and render multiple times
 with my actors so I just need to get refs to them and somehow use that when I go to render them in my drawcall
+
+
+Glossary
+* SSBOs or Shader Storage Buffer Objects: globals for shaders but bigger than uniform buffers and can have an unspecified size up front
+
+TODOS (Closed)
+* why does each actor's mesh need its own descriptorset again? because of how I'm doing instancing: the xform for each actor is offset from 0 from the SSBO xform buf. This could just be one big buffer that we use an instance offset for as well (and that's probably the 'right' way to do it), this is just how I did it
