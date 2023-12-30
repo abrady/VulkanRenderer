@@ -35,6 +35,9 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 # Log
 
 ## 12/29 Lighting
+![Alt text](Assets/Screenshots/first_lit_sphere.png)
+Victory! 
+
 * yay, onto the next level
 * now that I've read about lighting and made some notes below. what next?
     1. define a material, we need the ambient and diffuse properties at least

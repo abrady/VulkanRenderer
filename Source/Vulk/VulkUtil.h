@@ -48,12 +48,13 @@ do { \
 } while (0)
 
 enum VulkShaderBindings {
-    VulkShaderBinding_UBO = 0,
+    VulkShaderBinding_XformsUBO = 0,
     VulkShaderBinding_Sampler = 1,
     VulkShaderBinding_Actors = 2,
     VulkShaderBinding_Lights = 3,
     VulkShaderBinding_Materials = 4,
-    VulkShaderBinding_NumBindings = 5,
+    VulkShaderBinding_EyePos = 5,
+    VulkShaderBinding_NumBindings = 6,
 };
 
 

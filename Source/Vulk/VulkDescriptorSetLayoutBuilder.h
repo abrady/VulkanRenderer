@@ -6,7 +6,7 @@ class Vulk;
 
 class VulkDescriptorSetLayoutBuilder {
 public:
-    VulkDescriptorSetLayoutBuilder& addUniformBuffer(uint32_t binding, VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT);
+    VulkDescriptorSetLayoutBuilder& addUniformBuffer(uint32_t binding, VkShaderStageFlags stageFlags);
     VulkDescriptorSetLayoutBuilder& addSampler(uint32_t binding, VkShaderStageFlags stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT);
     VulkDescriptorSetLayoutBuilder& addStorageBuffer(uint32_t binding, VkShaderStageFlags stageFlags);
 

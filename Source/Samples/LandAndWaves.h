@@ -160,7 +160,7 @@ public:
         }
 
         actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
-            .addUniformBuffer(0)
+            .addUniformBuffer(0, VK_SHADER_STAGE_VERTEX_BIT)
             .addSampler(1)
             .addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT)
             .build(*this);
@@ -216,7 +216,7 @@ public:
         }
 
         wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
-            .addUniformBuffer(0)
+            .addUniformBuffer(0, VK_SHADER_STAGE_VERTEX_BIT)
             .addSampler(1)
             .build(*this);
 

@@ -6,43 +6,20 @@
 #include "Vulk/VulkCamera.h"
 #include "Vulk/VulkPipelineBuilder.h"
 #include "Vulk/VulkDescriptorPoolBuilder.h"
+#include "Vulk/VulkUniformBuffer.h"
+#include "Vulk/VulkStorageBuffer.h"
 
 class Lighting : public Vulk {
-    template<typename T>
-    struct MappedSSBO {
-        VkBuffer buf;
-        VkDeviceMemory mem;
-        T* mappedObjs; // contiguous array of memory mapped actor instance info
+    VulkCamera camera;
 
-        void createAndMap(Vulk &vk, uint32_t numActors) {
-            VkDeviceSize bufferSize = sizeof(T) * numActors;
-            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buf, mem);
-            vkMapMemory(vk.device, mem, 0, bufferSize, 0, (void**)&mappedObjs);
-        }
-        void cleanup(VkDevice dev) {
-            vkDestroyBuffer(dev, buf, nullptr);
-            vkFreeMemory(dev, mem, nullptr);
-        }        
-    };
-
-    struct UniformBufferObject {
+    struct XformsUBO {
         alignas(16) glm::mat4 world;
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
     };
-    VulkCamera camera;
 
-    struct UBO {
-        VkBuffer buf;
-        VkDeviceMemory mem;
-        UniformBufferObject* mappedUBO;
-        void createUniformBuffers(Vulk &vk) {
-            VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-            vk.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buf, mem);
-            vkMapMemory(vk.device, mem, 0, bufferSize, 0, (void**)&mappedUBO);
-        }
-    };
-    std::array<UBO, MAX_FRAMES_IN_FLIGHT> ubos;
+    std::array<VulkUniformBuffer<XformsUBO>, MAX_FRAMES_IN_FLIGHT> xformsUBOs;
+    std::array<VulkUniformBuffer<glm::vec3>, MAX_FRAMES_IN_FLIGHT> eyePosUBOs;
 
     struct ActorSSBOElt {
         glm::mat4 xform;
@@ -52,7 +29,7 @@ class Lighting : public Vulk {
         VulkMeshRef meshRef; // what we're drawing
         std::vector<VulkActor> actors; // the actors that use this mesh
         std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets; // the per-frame descriptor sets
-        std::array<MappedSSBO<ActorSSBOElt>, MAX_FRAMES_IN_FLIGHT> ssbos; // the per-frame actor xforms
+        std::array<VulkStorageBuffer<ActorSSBOElt>, MAX_FRAMES_IN_FLIGHT> ssbos; // the per-frame actor xforms
         void updateActorSSBO(uint32_t curFrame) {
             auto &res = ssbos[curFrame];
             for (int i = 0; i < actors.size(); i++) {
@@ -137,7 +114,7 @@ class Lighting : public Vulk {
         {0.01f, 0.01f, 0.01f},
         0.5f
     };
-    MappedSSBO<Material> materialsSSBO;
+    VulkStorageBuffer<Material> materialsSSBO;
 
     struct Light {
         glm::vec4 pos;
@@ -147,21 +124,33 @@ class Lighting : public Vulk {
         {0.0f, 100.0f, 0.0f, 1.0f},
         {1.0f, 1.0f, 1.0f, 1.0f}
     };
-    MappedSSBO<Light> lightsSSBO;
+    VulkStorageBuffer<Light> lightsSSBO;
 
 public:
     void init() override {
-        camera.lookAt(glm::vec3(0.f, 1.f, 2.f), glm::vec3(0.f, 0.f, 0.f));
+        camera.lookAt(glm::vec3(0.f, 1.2f, 2.5f), glm::vec3(0.f, 0.f, 0.f));
 
         createTextureImage("Assets/Textures/uv_checker.png", textureImageMemory, textureImage);
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
         textureSampler = createTextureSampler();
-        for (auto &ubo: ubos) {
+        for (auto &ubo: xformsUBOs) {
+            ubo.createUniformBuffers(*this);
+        }
+        for (auto &ubo: eyePosUBOs) {
             ubo.createUniformBuffers(*this);
         }
 
+        // create the materials SSBO
+        materialsSSBO.createAndMap(*this, 1);
+        materialsSSBO.mappedObjs[0] = material;
+
+        // create the lights SSBO
+        lightsSSBO.createAndMap(*this, 1);
+        lightsSSBO.mappedObjs[0] = light;
+
         actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
-            .addUniformBuffer(VulkShaderBinding_UBO)
+            .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
+            .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addSampler(VulkShaderBinding_Sampler)
             .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_VERTEX_BIT)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -189,7 +178,7 @@ public:
         actorsRender.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
         uint32_t numMeshes = static_cast<uint32_t>(meshActors.size());
         actorsDescriptorPool = VulkDescriptorPoolBuilder()
-            .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
+            .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes * 2)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
             .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes * 3)
             .build(device, MAX_FRAMES_IN_FLIGHT * numMeshes);
@@ -204,22 +193,15 @@ public:
                 // create the descriptor set
                 meshRenderInfo.descriptorSets[i] = createDescriptorSet(actorsDescriptorSetLayout, actorsDescriptorPool);
                 VulkDescriptorSetUpdater(meshRenderInfo.descriptorSets[i])
-                    .addUniformBuffer(ubos[i].buf, sizeof(UniformBufferObject), 0)
-                    .addImageSampler(textureImageView, textureSampler, 1)
+                    .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
+                    .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
+                    .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_Sampler)
                     .addStorageBuffer(meshRenderInfo.ssbos[i].buf, sizeof(ActorSSBOElt) * numActors, VulkShaderBinding_Actors)
                     .addStorageBuffer(lightsSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
                     .addStorageBuffer(materialsSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
                     .update(device);
             }
         }
-
-        // create the materials SSBO
-        materialsSSBO.createAndMap(*this, 1);
-        materialsSSBO.mappedObjs[0] = material;
-
-        // create the lights SSBO
-        lightsSSBO.createAndMap(*this, 1);
-        lightsSSBO.mappedObjs[0] = light;
     }
 
 private:
@@ -237,7 +219,7 @@ private:
     }
 
 
-    void updateUniformBuffer(UniformBufferObject &ubo) {
+    void updateXformsUBO(XformsUBO &ubo) {
         static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
@@ -254,7 +236,8 @@ private:
     }
 
     void drawFrame(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer) override {
-        updateUniformBuffer(*ubos[currentFrame].mappedUBO);
+        updateXformsUBO(*xformsUBOs[currentFrame].mappedUBO);
+        *eyePosUBOs[currentFrame].mappedUBO = camera.eye;
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -316,9 +299,12 @@ private:
         vkDestroyPipelineLayout(device, actorsPipelineLayout, nullptr);
         vkDestroyRenderPass(device, renderPass, nullptr);
 
-        for (auto ubo: ubos) {
-            vkDestroyBuffer(device, ubo.buf, nullptr);
-            vkFreeMemory(device, ubo.mem, nullptr);
+        for (auto ubo: xformsUBOs) {
+            ubo.cleanup(*this);
+        }
+
+        for (auto ubo: eyePosUBOs) {
+            ubo.cleanup(*this);
         }
 
         for (auto &meshActor : meshActors) {
@@ -341,7 +327,7 @@ private:
             glm::vec3 fwd = camera.getForwardVec();
             glm::vec3 right = camera.getRightVec();
             glm::vec3 up = camera.getUpVec();
-            float move = 10.f;
+            float move = 1.f;
             bool handled = true;
             if (key == GLFW_KEY_W) {
                 camera.eye += move * fwd;

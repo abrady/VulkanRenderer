@@ -23,7 +23,9 @@ void main() {
     mat4 worldMat = ubo.world * instance.model[gl_InstanceIndex];
     gl_Position = ubo.proj * ubo.view * worldMat * vec4(inPosition, 1.0);
     fragTexCoord = inTexCoord;
-    fragPos = worldMat * vec4(inPosition, 1.0);
+
+    // this cast should also be okay assuming an affine transformation
+    fragPos = vec3(worldMat * vec4(inPosition, 1.0));
 
     // if we do any scaling or shearing, we need to use the inverse transpose of the world matrix
     // but since I'm not doing any of that, we can just use the world matrix
