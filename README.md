@@ -34,6 +34,12 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 12/29 Material Textures? or more types of lights?
+* what should I do next? round out the types of lights
+    * light attenuation
+    * spotlight
+    * directional
+
 ## 12/29 Lighting
 ![Alt text](Assets/Screenshots/first_lit_sphere.png)
 Victory! 

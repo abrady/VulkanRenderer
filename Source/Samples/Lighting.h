@@ -117,12 +117,20 @@ class Lighting : public Vulk {
     VulkStorageBuffer<Material> materialsSSBO;
 
     struct Light {
-        glm::vec4 pos;
-        glm::vec4 color;
+        glm::vec3 pos;          // point light only
+        glm::vec4 color;        // color of light
+        float falloffStart;     // point/spot light only
+        float falloffEnd;       // point/spot light only: negative means no falloff 
+        glm::vec3 direction;    // directional/spot light only
+        float spotPower;        // spotlight only
     };
     Light light = {
-        {0.0f, 100.0f, 0.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f, 1.0f}
+        {0.0f, 100.0f, 0.0f},
+        {1.0f, 1.0f, 1.0f, 1.0f},
+        0.0f,
+        0.0f,
+        {0.0f, 0.0f, 0.0f},
+        0.0f,
     };
     VulkStorageBuffer<Light> lightsSSBO;
 

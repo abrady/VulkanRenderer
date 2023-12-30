@@ -15,9 +15,14 @@ struct Material {
     float roughness;
 };
 
+// note that the order matters here: it allows this to be packed into 3 vec4s
 struct Light {
-    vec3 pos;
-    vec4 color;
+    vec3 pos;           // point light only
+    vec4 color;         // color of light
+    float falloffStart; // point/spot light only
+    vec3 direction;     // directional/spot light only
+    float falloffEnd;   // point/spot light only    
+    float spotPower;    // spotlight only
 };
 
 layout(std430, binding = 3) buffer LightBuf {
@@ -30,6 +35,13 @@ layout(std430, binding = 4) buffer MaterialBuf {
 
 layout(location = 0) out vec4 outColor;
 
+float calcAttenuation(float dist, float falloffStart, float falloffEnd) {
+    if (falloffEnd <= falloffStart) {
+        return 1.0;
+    }
+    return clamp(1.0 - (dist - falloffStart) / (falloffEnd - falloffStart), 0.0, 1.0);
+}
+
 void main() {
     Light light = lightBuf.light;
     Material material = materialBuf.material;
@@ -39,6 +51,10 @@ void main() {
     vec3 lightDir = normalize(light.pos - fragPos);
     float lambert = max(dot(fragNormal, lightDir), 0.0);
     vec3 v = normalize(eyePos - fragPos);
+
+    // attenuate the lambert
+    // float dist = length(light.pos - fragPos);
+    // lambert *= calcAttenuation(dist, light.falloffStart, light.falloffEnd);
 
     // c_a + c_d + c_s = A_l⊗m_d + B⊗max(N . L, 0){m_d* + [F_0 + (1 - F_0)(1 - N.v)^5](m + 8)/8(n.h)^m}
 
