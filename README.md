@@ -28,12 +28,34 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 * Install [TinyObjLoader](https://github.com/tinyobjloader/tinyobjloader)
 * Install [STB](https://github.com/nothings/stb)
 
+* make sure your CMakeLists.txt points to the proper directory
+* run `cmake -S . -B build` from the root of the project
+
 # TODOs
 * I've been sloppy naming structs: MeshRender, MeshRenderInfo, MeshFrameResources: make this more coherent
 * tests for lighting? I'm vaguely nervous about math errors and having something that looks fine to my untrained eye but is actually wrong.
-* it feels like the descriptor set layout could inform the descriptor pool allocator...
+* it feels like the descriptor set layout could inform the descriptor pool allocator and descriptor set updater...
 
 # Log
+
+## More types of lights
+Let's add some more lights
+* what should I do next? round out the types of lights
+    * directional
+    * light attenuation
+    * spotlight
+
+### Directional Lights
+Given:
+* N: normal at p
+* L: negative direction of the light
+* C: color of the light
+
+we can calculate the light energy that strikes a surface as follows:
+* lambert = max(dot(N,L),0)
+* L_energy = lambert * C
+
+Then just plug this into the rest of your lighting calculations as usual.
 
 ## 12/30 debugging the sphere
 ![Alt text](/Assets/Screenshots/black_back_of_sphere.png)
