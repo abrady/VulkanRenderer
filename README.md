@@ -9,10 +9,11 @@ Some quick thoughts on my approach: one thing you might notice is that I avoid w
 ...
 
 # Samples
-1. [Viking Room](Samples/VikingRoom.h) - loads a model and renders it
-2. [Shape Geometry](Samples/)
-3. [Scene](Samples/Scene.h) - a scene with a floor and some cylinders and spheres, uses instancing
-4. [Land and Waves](Samples/LandAndWaves.h) - a procedurally generated terrain example
+1. [Viking Room](/Source/Samples/VikingRoom.h) - loads a model and renders it
+2. [Shape Geometry](/Source/Samples/)
+3. [Scene](/Source/Samples/Scene.h) - a scene with a floor and some cylinders and spheres, uses instancing
+4. [Land and Waves](/Source/Samples/LandAndWaves.h) - a procedurally generated terrain example
+5. [Lights](/Source/Samples/Lighting.h)
 
 # Resources
 * [Vulkan Tutorial](https://vulkan-tutorial.com/Introduction)
