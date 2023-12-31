@@ -46,7 +46,7 @@ class Lighting : public Vulk {
     VkDescriptorPool actorsDescriptorPool;
     std::unordered_map<char const *, MeshRenderInfo> meshActors;
 
-    struct MeshRender {
+    struct MeshRenderBuffers {
         VkBuffer vertexBuffer;
         VkDeviceMemory vertexBufferMemory;
 
@@ -78,7 +78,7 @@ class Lighting : public Vulk {
     };
 
     VkDescriptorSetLayout actorsDescriptorSetLayout;
-    MeshRender actorsRender;
+    MeshRenderBuffers actorsRenderBuffers;
     VkPipelineLayout actorsPipelineLayout;
     VkPipeline actorsGraphicsPipeline;
 
@@ -99,10 +99,6 @@ class Lighting : public Vulk {
     VkSampler textureSampler;
 
     bool rotateWorld = true;
-
-    float getTerrainHeight(Vertex const &v) {
-        return 0.3f * (v.pos.z * sinf(0.1f * v.pos.x) + v.pos.x * cosf(0.1f * v.pos.z));
-    }
 
     struct Material {
         glm::vec4 diffuse;
@@ -125,14 +121,14 @@ class Lighting : public Vulk {
         float spotPower;        // spotlight only
     };
     Light light = {
-        {0.0f, 100.0f, 0.0f},
+        {100.0f, 0.0f, 0.0f},
         {1.0f, 1.0f, 1.0f, 1.0f},
         0.0f,
         0.0f,
         {0.0f, 0.0f, 0.0f},
         0.0f,
     };
-    VulkStorageBuffer<Light> lightsSSBO;
+    VulkStorageBuffer<Light> lightSSBO;
 
 public:
     void init() override {
@@ -153,8 +149,8 @@ public:
         materialsSSBO.mappedObjs[0] = material;
 
         // create the lights SSBO
-        lightsSSBO.createAndMap(*this, 1);
-        lightsSSBO.mappedObjs[0] = light;
+        lightSSBO.createAndMap(*this, 1);
+        lightSSBO.mappedObjs[0] = light;
 
         actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
@@ -183,7 +179,7 @@ public:
             {{"sphere0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
         };
 
-        actorsRender.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
+        actorsRenderBuffers.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
         uint32_t numMeshes = static_cast<uint32_t>(meshActors.size());
         actorsDescriptorPool = VulkDescriptorPoolBuilder()
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes * 2)
@@ -205,7 +201,7 @@ public:
                     .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
                     .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_Sampler)
                     .addStorageBuffer(meshRenderInfo.ssbos[i].buf, sizeof(ActorSSBOElt) * numActors, VulkShaderBinding_Actors)
-                    .addStorageBuffer(lightsSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
+                    .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
                     .addStorageBuffer(materialsSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
                     .update(device);
             }
@@ -260,7 +256,7 @@ private:
         renderPassInfo.renderArea.extent = swapChainExtent;
 
         std::array<VkClearValue, 2> clearValues{};
-        clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+        clearValues[0].color = { {0.5f, 0.0f, 0.5f, 1.0f} };
         clearValues[1].depthStencil = { 1.0f, 0 };
 
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -287,8 +283,8 @@ private:
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &actorsRender.vertexBuffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, actorsRender.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &actorsRenderBuffers.vertexBuffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, actorsRenderBuffers.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
         for (auto &meshActor: meshActors) {
             MeshRenderInfo &meshRenderInfo = meshActor.second;
@@ -325,9 +321,9 @@ private:
         vkDestroyImageView(device, textureImageView, nullptr);
         vkDestroyImage(device, textureImage, nullptr);
         vkFreeMemory(device, textureImageMemory, nullptr);
-        actorsRender.cleanup(*this);
+        actorsRenderBuffers.cleanup(*this);
         materialsSSBO.cleanup(device);
-        lightsSSBO.cleanup(device);
+        lightSSBO.cleanup(device);
     }
 
     void keyCallback(int key, int scancode, int action, int mods) {

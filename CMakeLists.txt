@@ -1,6 +1,15 @@
+
 # CMakeList.txt : CMake project for vulkan5, include source and define
 # WARNING: in certain cases you may need to re-run CMake: Configure (or from the command line do cmake -B build -S vulkan5)
 #          e.g. when I set the generatore platform. 
+#
+# cmake -DCMAKE_BUILD_TYPE=Debug - for Debug build
+
+if(NOT CMAKE_BUILD_TYPE)
+    message("CMAKE_BUILD_TYPE not set, defaulting to Debug")
+    set(CMAKE_BUILD_TYPE Debug)
+endif()
+
 cmake_minimum_required (VERSION 3.8)
 project ("VulkanRenderer")
 
@@ -20,7 +29,11 @@ include_directories("${VULKAN_UTILS}\\tinyobjloader")
 include_directories("$ENV{VK_SDK_PATH}/include")
 add_compile_options(-W3)
 
-set(TARGET_DIR "${CMAKE_BINARY_DIR}/Debug") # TODO: configure so it will work for release builds too
+# TODO: configure so it will work for release builds too
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(TARGET_DIR "${CMAKE_BINARY_DIR}/Debug") 
+    set(GLSLC_FLAGS "-g" "-O0") # build debug symbols and turn off optimizations
+endif()
 
 ##############################################################################
 ## Models 
@@ -113,7 +126,7 @@ foreach(SHADER ${VERTEX_SHADERS})
     set(SHADER_OUTPUT "${SHADER_DEST_DIR}/vert/${SHADER_NAME}.spv")
     add_custom_command(
         OUTPUT "${SHADER_OUTPUT}"
-        COMMAND glslc "${SHADER}" -o "${SHADER_OUTPUT}"
+        COMMAND glslc ${GLSLC_FLAGS} "${SHADER}" -o "${SHADER_OUTPUT}"
         DEPENDS ${SHADER}
         COMMENT "building vertex shader ${SHADER}"
     )
@@ -127,7 +140,7 @@ foreach(SHADER ${FRAGMENT_SHADERS})
     set(SHADER_OUTPUT "${SHADER_DEST_DIR}/frag/${SHADER_NAME}.spv")
     add_custom_command(
         OUTPUT "${SHADER_OUTPUT}"
-        COMMAND glslc "${SHADER}" -o "${SHADER_OUTPUT}"
+        COMMAND glslc ${GLSLC_FLAGS} "${SHADER}" -o "${SHADER_OUTPUT}"
         DEPENDS ${SHADER}
         COMMENT "building fragment shader ${SHADER}"
     )

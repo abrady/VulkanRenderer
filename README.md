@@ -34,6 +34,48 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 12/30 debugging the sphere
+![Alt text](/Assets/Screenshots/black_back_of_sphere.png)
+When I was moving the light around to validate the shader I noticed the sphere looked like the back half was getting shaved off. I made the clear color magenta to highlight this better. If I just do ambient it looks fine, so best guess is that this is the specular somehow becoming negative. I could just mess around until I figured it out, but this seems like the perfect chance to do some shader debugging.
+
+How can you debug shaders? let's ask ChatGPT
+* RenderDoc:
+    * Description: RenderDoc is a frame-capture based graphics debugger, often used for analyzing and debugging Vulkan (as well as other API) applications. It captures all the data you need to recreate a rendering event, allowing you to inspect each draw call and the state of the GPU.
+    * Usefulness: It's invaluable for understanding what's happening in your draw calls and for inspecting the state of the pipeline and shaders at any point in time.
+* Intel® Graphics Performance Analyzers (Intel® GPA):
+    * Description: Intel® GPA provides a suite of tools for graphics analysis and optimizations that can help you make the most of Intel's integrated graphics and other compatible GPUs. It includes a range of features for analyzing CPU & GPU workloads, understanding bottlenecks, and visualizing performance data. While it's optimized for Intel hardware, it can provide insights for any platform compatible with its analysis features.
+    * Usefulness: Intel® GPA is particularly useful for performance tuning and optimization. It allows you to analyze the rendering pipeline, understand how your shaders affect performance, and experiment with changes to see their impact. For Vulkan development, it can help in optimizing both the compute and graphics workloads that your shaders are part of.
+* NVIDIA Nsight Graphics:
+    * Description: Nsight Graphics is a powerful debugging and performance analysis tool that supports Vulkan among other APIs. It allows you to inspect your application at a high level and dive down into the details to understand how your graphics API usage affects the GPU.
+    * Usefulness: It's particularly useful for performance analysis and for developers using NVIDIA GPUs. It offers shader debugging with the ability to inspect variables and step through shader code.
+
+I've used RenderDoc and Intel GPA professionally before, let's start with RenderDoc. My goal is to see if I can debug any one of the black pixels we see at the left side of the sphere:
+* looking at the Texture Viewer
+    * right click on one of the black pixels
+    * click 'History'
+    * in the 'Pixel History on Swapchain etc.' I see two operations
+        1. clearing the pixel to magenta
+        2. the pixel being turned black. for this operation I can expand the operations and I see Shader Out:
+            * R: nan
+            * G: nan
+            * B: nan
+            * A: nan
+* well okay, some bad float operations going on, makes sense now. Let's see if I can actually debug the operations. https://renderdoc.org/docs/how/how_debug_shader.html - renderdoc does support debugging, apparently
+    * glslc needs -g and -O0 (dash oh zero)
+* To debug just right click on the event in the 'Pixel History on Swapchain etc.' (EID 17 in my case) and select Debug
+    * aha! this line is bad: vec4 microfacet = vec4((m + 8) / 8 * pow(dot(fragNormal, h), m));
+    * why?
+        * ah! pow(dot(fragNormal, h), m) is the problem:
+            * dot(fragNormal, h) is negative
+            * m is a float
+        * so taking a negative number to a non-integer exponent required imaginary numbers, so it just errors. just cast m to an int (should probably do this anyway)
+    * hmm, not working. why? let's check the spec: https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.60.html#exponential-functions
+        * "Results are undefined if x < 0"
+    * whoops, okay, just put a 'max' on that.
+* fixed!
+![Alt text](/Assets/Screenshots/fixed_back_of_sphere.png)
+
+
 ## 12/29 Material Textures? or more types of lights?
 * what should I do next? round out the types of lights
     * light attenuation

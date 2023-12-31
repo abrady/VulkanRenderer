@@ -1,5 +1,29 @@
 #include "Vulk.h"
 
+void Vulk::run() {
+    initWindow();
+    initVulkan();
+    init();
+
+    lastFrameTime = std::chrono::steady_clock::now();
+    while (!glfwWindowShouldClose(window)) {
+        handleEvents();
+        glfwPollEvents();
+        render();
+
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFrameTime);
+        if (elapsed_time < msPerFrame) { // 16ms = 60fps
+            std::this_thread::sleep_for(msPerFrame - elapsed_time);
+        }
+        lastFrameTime = std::chrono::steady_clock::now();
+    }
+
+    vkDeviceWaitIdle(device);
+    cleanupVulkan(); // calls cleanup
+}
+
+
 void Vulk::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory)
 {
     VkBufferCreateInfo bufferInfo{};
@@ -45,6 +69,38 @@ void Vulk::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 
     endSingleTimeCommands(commandBuffer);
+}
+
+void Vulk::initWindow() {
+    glfwInit();
+
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+    window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+    glfwSetWindowUserPointer(window, this);
+    glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    glfwSetKeyCallback(window, dispatchKeyCallback);
+}
+
+void Vulk::framebufferResizeCallback(GLFWwindow* window, int /*width*/, int /*height*/) {
+    auto app = reinterpret_cast<Vulk*>(glfwGetWindowUserPointer(window));
+    app->framebufferResized = true;
+}
+
+void Vulk::initVulkan() {
+    createInstance();
+    setupDebugMessenger();
+    createSurface();
+    pickPhysicalDevice();
+    createLogicalDevice();
+    createSwapChain();
+    createImageViews();
+    createRenderPass();
+    createCommandPool();
+    createCommandBuffers();
+    createDepthResources();
+    createFramebuffers();
+    createSyncObjects();
 }
 
 void Vulk::cleanupSwapChain() {

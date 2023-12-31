@@ -65,11 +65,14 @@ void main() {
     vec4 diffuse = lambert * light.color * material.diffuse;
 
     // max(L.n,0)B⊗[F_0 + (1 - F_0)(1 - N.v)^5][(m + 8)/8(n.h)^m]
-    float m = material.roughness * 8;
     vec4 R0 = vec4(material.fresnelR0, 1.0);
     vec3 h = normalize(v + lightDir);
     vec4 fresnel = R0 + (vec4(1.0) - R0) * pow(1.0 - dot(fragNormal,v), 5.0);
-    vec4 microfacet = vec4((m + 8) / 8 * pow(dot(fragNormal, h), m));
+
+    int m = int(material.roughness * 8);
+    float nDotH = max(dot(fragNormal, h), 0);
+    float powNDotH = pow(nDotH, m);
+    vec4 microfacet = vec4((m + 8) / 8 * powNDotH);
     vec4 specular = lambert*(fresnel + microfacet);
 
     // combine

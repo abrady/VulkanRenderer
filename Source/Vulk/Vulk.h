@@ -5,21 +5,23 @@
 
 #include "VulkUtil.h"
 
-#include <iostream>
-#include <fstream>
-#include <stdexcept>
 #include <algorithm>
-#include <chrono>
-#include <vector>
-#include <cstring>
-#include <cstdlib>
-#include <cstdint>
-#include <limits>
 #include <array>
+#include <chrono>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <limits>
 #include <optional>
 #include <set>
+#include <stdexcept>
+#include <thread>
 #include <unordered_map>
+#include <vector>
 
+using namespace std::chrono_literals;
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -35,20 +37,10 @@ static const std::vector<const char*> deviceExtensions = {
 
 
 class Vulk {
+    std::chrono::time_point<std::chrono::steady_clock> lastFrameTime;
+    std::chrono::milliseconds msPerFrame = 16ms; // 60 fps
 public:
-    void run() {
-        initWindow();
-        initVulkan();
-        init();
-        while (!glfwWindowShouldClose(window)) {
-            handleEvents();
-            glfwPollEvents();
-            render();
-        }
-
-        vkDeviceWaitIdle(device);
-        cleanupVulkan(); // calls cleanup
-    }
+    void run();
 public:
     VkDevice device;
     VkRenderPass renderPass;
@@ -102,53 +94,10 @@ private:
 
     bool framebufferResized = false;
 
-    void initWindow() {
-        glfwInit();
-
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-        window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
-        glfwSetWindowUserPointer(window, this);
-        glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
-        glfwSetKeyCallback(window, dispatchKeyCallback);
-    }
-
-    static void framebufferResizeCallback(GLFWwindow* window, int /*width*/, int /*height*/) {
-        auto app = reinterpret_cast<Vulk*>(glfwGetWindowUserPointer(window));
-        app->framebufferResized = true;
-    }
-
-    // takes care of:
-    // - creating the instance
-    // - setting up the validation layers
-    // - creating the surface
-    // - picking the physical device
-    // - creating the logical device, queues, swap chain
-    // - creating the render pass
-    // - creating the command pool
-    // - creating the framebuffers
-    // - creating the depth resources
-    // - creating the sync objects
-    // when you extend this class you need to take care of all the rendering specific things:
-    // - descriptor set layout
-    // - pipeline
-    // - load your textures, models, vert/index buffers, descriptor pools and sets etc.
-    void initVulkan() {
-        createInstance();
-        setupDebugMessenger();
-        createSurface();
-        pickPhysicalDevice();
-        createLogicalDevice();
-        createSwapChain();
-        createImageViews();
-        createRenderPass();
-        createCommandPool();
-        createCommandBuffers();
-        createDepthResources();
-        createFramebuffers();
-        createSyncObjects();
-    }
-
+    static void framebufferResizeCallback(GLFWwindow* window, int /*width*/, int /*height*/);
+    
+    void initWindow();
+    void initVulkan();
     void cleanupSwapChain();
     void cleanupVulkan();
     void recreateSwapChain();
