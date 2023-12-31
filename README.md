@@ -38,12 +38,17 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
-## More types of lights
-Let's add some more lights
+## 12/30 Lighting the land and waves
+* let's put a light in the land and waves demo
+
+## 12/30 More types of lights
+I'm not feeling more lights stuff right now, looks like more of what I've already done.
+
 * what should I do next? round out the types of lights
     * directional
     * light attenuation
     * spotlight
+    * multiple lights?
 
 ### Directional Lights
 Given:
