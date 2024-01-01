@@ -41,6 +41,91 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 1/1/24 Lit land and waves
+![](Assets/Screenshots/lit_land_and_waves.png)
+
+Behold the most beautiful land and waves render you could imagine.
+
+* x normals on waves
+* x material for waves
+
+
+
+## 1/1/24 Lit land
+
+![](Assets/Screenshots/terrain_normals.png)
+
+These normals look more like bad hair rendering than proper normals, which is what I suspected, did I do the partial derivatives wrong? eh, screw it, I'm just going to ask chatGPT for the formula
+
+![](Assets/Screenshots/terrain_normals_chatgpt.png)
+
+Nope, thanks for nothing chatgpt. am I thinking about this wrong? If I have y = cos(x) then then tangent dy/dx = -sin(x), right? let's 
+
+Okay, figured it out, given the grad of our y function (dy/dx,dy/dz) we can find two tangent vectors as follows:
+* Tz = (0,dy/dz,1)
+* Tx = (1,dy/dx,0)
+
+The cross product of this is just:
+* (dy/dx,-1,dz/dx), but we know we want y to be positive so do Tz x Ty and you get
+* (-dy/dx,1,dy/dz), yaaay.
+
+Plugging this into our terrain equation is fairly straightforward, and we get:
+
+![](Assets/Screenshots/terrain_normals_correct.png)
+
+
+
+
+## 1/1/24 Normals rendering
+Happy new year!
+
+My sidetrack experiment of using a geometry shader to render normals has taken more time than expected, but that's okay, I've learned a lot about pipelines.
+
+Here's what I'm doing:
+* the descriptor set layout is just:
+    * the usual global transforms
+    * the instance transforms for each actor
+    * but: these are bound to the geometry stage instead of the vert stage: VK_SHADER_STAGE_GEOMETRY_BIT
+* make a pipeline for rendering normals that:
+    * disables z tests
+    * uses VK_PRIMITIVE_TOPOLOGY_POINT_LIST so we're rendering points and not triangles
+    * disables backface culling
+    * takes a geometry shader on top of the usual vert/frag shaders
+* for the shaders
+    * the vert shader just passes things through untransformed - we need world space 
+    * has a geometry shader that takes points/normals as input and outputs two verts at the start and end of the normal (see [normals.geom](/Source/Shaders/Geom/normals.geom))
+
+
+Here's what I got:
+
+![Alt text](/Assets/Screenshots/normals_render_not_working.png)
+
+Hmm, none of the normals are showing up. Let's fire up renderdoc.
+
+Renderdoc lets you highlight what was just drawn in the texture viewer:
+
+![Alt text](/Assets/Screenshots/renderdoc_texture_viewer_highlight_drawcall.png)
+
+Turning this on I see:
+
+![](Assets/Screenshots/renderdoc_highlight_normals.png)
+
+So the normals are being rendered, they're just not showing up. let's see if we can debug this in the fragment shader.
+
+* zoom in on a texture like this: ![](Assets/Screenshots/renderdoc_zoomed_in_texture.png)
+* click on history ![](Assets/Screenshots/renderdoc_texture_history.png)
+
+![](Assets/Screenshots/renderdoc_no_pixel_shader_bound.png)
+
+it is saying that there is no pixel shader bound... what does that mean?
+* OMFG, the number of shaders was hard coded to 2, thank you renderdoc.
+
+![](Assets/Screenshots/normals_rendering_properly.png)
+
+yaay! although I am surprised I'm not seeing the normals in the back, maybe the symmetry is causing them to be hidden? oh yeah, when I animate it you can see the backface ones too
+
+
+
 ## 12/30 Lighting the land and waves
 let's put a light in the land and waves demo
 

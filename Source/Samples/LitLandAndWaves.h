@@ -123,7 +123,7 @@ class LitLandAndWaves : public Vulk {
         float roughness;
     };
     Material material = {
-        {1.0f, 1.0f, 1.0f, 1.f},
+        {0.004f, 0.20f, 0.40f, .2f},
         {0.02f, 0.02f, 0.02f},
         0.5f
     };
@@ -138,8 +138,8 @@ class LitLandAndWaves : public Vulk {
         float spotPower;        // spotlight only
     };
     Light light = {
-        {300.0f, 0.0f, 0.0f},
-        {.1f, .1f, .1f, 1.0f},
+        {300.0f, 300.0f, 0.0f},
+        {.3f, .3f, .2f, 1.0f},
         0.0f,
         0.0f,
         {0.0f, 0.0f, 0.0f},
@@ -152,26 +152,30 @@ class LitLandAndWaves : public Vulk {
     }
 
     glm::vec3 getTerrainNormal(Vertex const &v) {
+        float x = v.pos.x;
+        float z = v.pos.z;
+
+        // given the grad of our y function (dy/dx,dy/dz) we can find two tangent vectors as follows:
+        // * Tx = (1,dy/dx,0)
+        // * Tz = (0,dy/dz,1)
+        //
+        // The cross product of Tz x Tx is the normal vector in the positive y direction:
+        // * (-dy/dx,1,dz/dx)
+
         // given the terrain height function: 0.3f * (v.pos.z * sinf(0.1f * v.pos.x) + v.pos.x * cosf(0.1f * v.pos.z));
-        glm::vec3 tX = {1.0f, 0.1f * v.pos.z * cosf(0.1f * v.pos.x) - v.pos.x * 0.1f * sinf(0.1f * v.pos.z), 0};
-        glm::vec3 tZ = {0, 0.1f * v.pos.x * cosf(0.1f * v.pos.z) - v.pos.z * 0.1f * sinf(0.1f * v.pos.x), 1.0f};
-        return glm::normalize(glm::cross(tX, tZ));
+        float dydx = 0.3f * (0.1f * z * cosf(0.1f * x) + cosf(0.1f * z));
+        float dydz = 0.3f * (sinf(0.1f * x) - 0.1f * x * sinf(0.1f * z));
+        glm::vec3 n = {-dydx, 1, -dydz};
+        return glm::normalize(n);
     }
 
-    bool renderNormals = true;
+    bool renderNormals = false;
     VkPipelineLayout normalsPipelineLayout;
     VkDescriptorSetLayout normalsDescriptorSetLayout;
     VkPipeline normalsPipeline;
 public:
     void init() override {
         camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
-
-        VulkMesh terrain;
-        makeGrid(160, 160, 50, 50, terrain);
-        for (auto &v : terrain.vertices) {
-            v.pos.y = getTerrainHeight(v);
-            v.normal = getTerrainNormal(v);
-        }
 
         createTextureImage("Assets/Textures/uv_checker.png", textureImageMemory, textureImage);
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -210,6 +214,22 @@ public:
             .addFragmentShaderStage("Assets/Shaders/Frag/litTerrain.spv")
             .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
 
+        // test normal rendering: do something a little simpler
+        // camera.lookAt(glm::vec3(0.f, 0.f, 2.1f), glm::vec3(0.f, 0.f, 0.f));
+        // VulkMesh sphere;
+        // makeGeoSphere(1.f, 3, sphere);
+        // meshActors["sphere"] = {
+        //     meshAccumulator.appendMesh(sphere),
+        //     {{"sphere0", glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f))}}
+        // };
+
+        VulkMesh terrain;
+        makeGrid(160, 160, 50, 50, terrain);
+        for (auto &v : terrain.vertices) {
+            v.pos.y = getTerrainHeight(v);
+            v.normal = getTerrainNormal(v);
+        }
+
         VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
         meshActors["terrain"] = {
             meshAccumulator.appendMesh(terrain),
@@ -236,7 +256,7 @@ public:
             .addFragmentShaderStage("Assets/Shaders/Frag/normals.spv")
             // .setLineWidth(10.f)
             .setCullMode(VK_CULL_MODE_NONE)
-            .setDepthTestEnabled(false)
+            // .setDepthTestEnabled(false)
             .setDepthWriteEnabled(false)
             .build(normalsDescriptorSetLayout, normalsPipelineLayout, normalsPipeline);        
 
@@ -350,8 +370,8 @@ private:
         ubo.world = glm::rotate(glm::mat4(1.0f), 0.5f * time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         glm::vec3 fwd = camera.getForwardVec();
         glm::vec3 lookAt = camera.eye + fwd;
-        glm::vec3 up = camera.getUpVec();
-        ubo.view = glm::lookAt(camera.eye, lookAt, up);
+        // glm::vec3 up = camera.getUpVec();
+        ubo.view = glm::lookAt(camera.eye, lookAt, glm::vec3(0, 1, 0));
         ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 1.f, 4000.0f);
         ubo.proj[1][1] *= -1;
     }
@@ -363,6 +383,11 @@ private:
 
         for (auto &v : wavesMesh.vertices) {
             v.pos.y = 0.05f * (v.pos.z * sinf(0.1f * v.pos.x + time) + v.pos.x * cosf(0.1f * v.pos.z + time));
+
+            // take instantaneous partial derivatives to get the normal
+            float dydx = 0.05f * (0.1f * v.pos.z * cosf(0.1f * v.pos.x + time) + cosf(0.1f * v.pos.z + time));
+            float dydz = 0.05f * (sinf(0.1f * v.pos.x + time) - 0.1f * v.pos.x * cosf(0.1f * v.pos.z + time));
+            v.normal = glm::normalize(glm::vec3(-dydx, 1, -dydz));
         }
 
         // update the buffer
@@ -387,7 +412,7 @@ private:
         renderPassInfo.renderArea.extent = swapChainExtent;
 
         std::array<VkClearValue, 2> clearValues{};
-        clearValues[0].color = { {0.5f, 0.0f, 0.5f, 1.0f} };
+        clearValues[0].color = { {0.1f, 0.0f, 0.1f, 1.0f} };
         clearValues[1].depthStencil = { 1.0f, 0 };
 
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -410,13 +435,13 @@ private:
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         // waves
-        // vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
-        // vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        // vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-        // vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender[currentFrame].vertexBuffer, offsets);
-        // vkCmdBindIndexBuffer(commandBuffer, wavesRender[currentFrame].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        // vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
-        // vkCmdDrawIndexed(commandBuffer, (uint32_t)wavesMesh.indices.size(), 1, 0, 0, 0);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender[currentFrame].vertexBuffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, wavesRender[currentFrame].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
+        vkCmdDrawIndexed(commandBuffer, (uint32_t)wavesMesh.indices.size(), 1, 0, 0, 0);
 
         // actors
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsGraphicsPipeline);
@@ -426,12 +451,12 @@ private:
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &actorsRenderBuffers.vertexBuffer, offsets);
         vkCmdBindIndexBuffer(commandBuffer, actorsRenderBuffers.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        // for (auto &meshActor: meshActors) {
-        //     MeshRenderInfo &meshRenderInfo = meshActor.second;
-        //     meshRenderInfo.updateActorSSBO(currentFrame); // is this safe? need to understand synchroniation better...;
-        //     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &meshRenderInfo.descriptorSets[currentFrame], 0, nullptr);
-        //     vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
-        // }
+        for (auto &meshActor: meshActors) {
+            MeshRenderInfo &meshRenderInfo = meshActor.second;
+            meshRenderInfo.updateActorSSBO(currentFrame); // is this safe? need to understand synchroniation better...;
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &meshRenderInfo.descriptorSets[currentFrame], 0, nullptr);
+            vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
+        }
 
         if (renderNormals) {
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, normalsPipeline);
@@ -497,7 +522,7 @@ private:
             glm::vec3 fwd = camera.getForwardVec();
             glm::vec3 right = camera.getRightVec();
             glm::vec3 up = camera.getUpVec();
-            float move = 1.f;
+            float move = 10.f;
             bool handled = true;
             if (key == GLFW_KEY_W) {
                 camera.eye += move * fwd;

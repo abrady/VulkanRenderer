@@ -30,7 +30,7 @@ void main() {
 
     // Output a second point offset by the normal
     normOut = worldNorm;
-    vec4 offsetPos = worldPos + 10.0 * vec4(worldNorm, 0.0);
+    vec4 offsetPos = worldPos + 10.f * vec4(worldNorm, 0.0);
     gl_Position = projView * offsetPos;
     EmitVertex();
 

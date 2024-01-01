@@ -17,7 +17,6 @@ class VulkPipelineBuilder {
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     std::vector<VkDynamicState> dynamicStates;
-    VkPipelineDynamicStateCreateInfo dynamicState{};
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 
 
