@@ -134,15 +134,30 @@ foreach(SHADER ${VERTEX_SHADERS})
 endforeach()
 # Compile fragment shaders
 file(MAKE_DIRECTORY ${SHADER_DEST_DIR}/Frag)
-file(GLOB_RECURSE FRAGMENT_SHADERS CONFIGURE_DEPENDS "${SHADER_SOURCE_DIR}/frag/*")
+file(GLOB_RECURSE FRAGMENT_SHADERS CONFIGURE_DEPENDS "${SHADER_SOURCE_DIR}/Frag/*")
 foreach(SHADER ${FRAGMENT_SHADERS})
     get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
-    set(SHADER_OUTPUT "${SHADER_DEST_DIR}/frag/${SHADER_NAME}.spv")
+    set(SHADER_OUTPUT "${SHADER_DEST_DIR}/Frag/${SHADER_NAME}.spv")
     add_custom_command(
         OUTPUT "${SHADER_OUTPUT}"
         COMMAND glslc ${GLSLC_FLAGS} "${SHADER}" -o "${SHADER_OUTPUT}"
         DEPENDS ${SHADER}
         COMMENT "building fragment shader ${SHADER}"
+    )
+    list(APPEND COMPILED_SHADERS "${SHADER_OUTPUT}")
+endforeach()
+
+# Compile fragment shaders
+file(MAKE_DIRECTORY ${SHADER_DEST_DIR}/Tess)
+file(GLOB_RECURSE GEOMETRY_SHADERS CONFIGURE_DEPENDS "${SHADER_SOURCE_DIR}/Geom/*")
+foreach(SHADER ${GEOMETRY_SHADERS})
+    get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
+    set(SHADER_OUTPUT "${SHADER_DEST_DIR}/Geom/${SHADER_NAME}.spv")
+    add_custom_command(
+        OUTPUT "${SHADER_OUTPUT}"
+        COMMAND glslc ${GLSLC_FLAGS} "${SHADER}" -o "${SHADER_OUTPUT}"
+        DEPENDS ${SHADER}
+        COMMENT "building geometry shader ${SHADER}"
     )
     list(APPEND COMPILED_SHADERS "${SHADER_OUTPUT}")
 endforeach()

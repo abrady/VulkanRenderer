@@ -44,6 +44,7 @@ public:
 public:
     VkDevice device;
     VkRenderPass renderPass;
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     void copyFromMemToBuffer(void const *srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -58,7 +59,6 @@ protected:
     virtual void cleanup() = 0;
 
     VkInstance instance;
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
     VkExtent2D swapChainExtent;

@@ -4,6 +4,7 @@
 
 class VulkPipelineBuilder {
     Vulk &vk;
+    
     std::vector<VkShaderModule> shaderModules;
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
     VkVertexInputBindingDescription bindingDescription = {};
@@ -19,10 +20,13 @@ class VulkPipelineBuilder {
     VkPipelineDynamicStateCreateInfo dynamicState{};
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 
+
+    VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
     VulkPipelineBuilder& addShaderStage(VkShaderStageFlagBits stage, char const *path);
     VulkPipelineBuilder& addVertexInputField(uint32_t binding, uint32_t location, uint32_t offset, VkFormat format);
 public:
-    VulkPipelineBuilder(Vulk &vk) : vk(vk) {}
+    VulkPipelineBuilder(Vulk &vk);
     
     VulkPipelineBuilder& addVertexShaderStage(char const *path) {
         return addShaderStage(VK_SHADER_STAGE_VERTEX_BIT, path);
@@ -31,6 +35,16 @@ public:
     VulkPipelineBuilder& addFragmentShaderStage(char const *path) {
         return addShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, path);
     }
+
+    VulkPipelineBuilder& addGeometryShaderStage(char const *path) {
+        return addShaderStage(VK_SHADER_STAGE_GEOMETRY_BIT, path);
+    }
+
+    VulkPipelineBuilder& setPrimitiveTopology(VkPrimitiveTopology topology);
+    VulkPipelineBuilder& setLineWidth(float lineWidth);
+    VulkPipelineBuilder& setCullMode(VkCullModeFlags cullMode);
+    VulkPipelineBuilder& setDepthTestEnabled(bool enabled);
+    VulkPipelineBuilder& setDepthWriteEnabled(bool enabled);
 
     // The binding says 'verts are in binding 0', and the stride says 'this is how far apart each vertex is'
     // then the field describe fields within the vertices: pos, normal, etc.

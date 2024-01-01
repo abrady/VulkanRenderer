@@ -35,11 +35,86 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 * I've been sloppy naming structs: MeshRender, MeshRenderInfo, MeshFrameResources: make this more coherent
 * tests for lighting? I'm vaguely nervous about math errors and having something that looks fine to my untrained eye but is actually wrong.
 * it feels like the descriptor set layout could inform the descriptor pool allocator and descriptor set updater...
+    * maybe we can have an 'addVertexBindings' for VulkPipelineBuilder that just does that boilerplate.
+* glslc includes must be a thing, I should look into that for some constants
+* 
 
 # Log
 
 ## 12/30 Lighting the land and waves
-* let's put a light in the land and waves demo
+let's put a light in the land and waves demo
+
+light the terrain:
+* need to calculate proper normals for the terrain
+* use the material we calculate in the frag shader from height
+
+terrain normals:
+* we calculate the height as follows: .3(v.pos.z * sinf(0.1f * v.pos.x) + v.pos.x * cosf(0.1f * v.pos.z)
+* so the tangents for this are the derivates with respect to x and z:
+    * t_x = [1, ∂y/∂x, 0] = [1, 0.1f * v.pos.z * cosf(0.1f * v.pos.x) - v.pos.x * 0.1f * sinf(0.1f * v.pos.z), 0]
+    * t_z = [0, ∂y/∂z, 1] = [0, v.pos.x * -0.1f * sinf(0.1f * v.pos.z) + sinf(0.1f * v.pos.x), 1]
+* and the normal is the cross product of these tangents
+
+![Alt text](/Assets/Screenshots/lit_terrain_0.png)
+
+Okay, this doesn't look right. what's the debugger saying:
+* fragNormal _73.xyz float3 -0.75879753, -0.51331687, 0.40091389
+* the transformed normal looks just fine in terms of looking like normals, the direction is definitely wrong though, but it is hard to just eyeball this. maybe I can just render the normals
+
+### Rendering normals
+* should be easy, looks like I can just make a geometry shader
+* hmm, how do we deal with the fact that gl_Position is in homogenous coordinates and already projected... let's check the spec
+    * [7.1.4. Geometry Shader Special Variables](https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.60.html#built-in-variables) sez
+        In the geometry shader, built-in variables are intrinsically declared as:
+        ```
+            in gl_PerVertex {
+                vec4 gl_Position;
+                float gl_PointSize;
+                float gl_ClipDistance[];
+                float gl_CullDistance[];
+            } gl_in[];
+
+            in int gl_PrimitiveIDIn;
+            in int gl_InvocationID;
+
+            out gl_PerVertex {
+                vec4 gl_Position;
+                float gl_PointSize;
+                float gl_ClipDistance[];
+                float gl_CullDistance[];
+            };
+
+            out int gl_PrimitiveID;
+            out int gl_Layer;
+            out int gl_ViewportIndex;
+        ```
+
+        Geometry Shader Input Variables
+        gl_Position, gl_PointSize, gl_ClipDistance, and gl_CullDistance contain the values written in the previous shader stage to the corresponding outputs.
+
+        gl_PrimitiveIDIn contains the number of primitives processed by the shader since the current set of rendering primitives was started.
+
+        gl_InvocationID contains the invocation number assigned to the geometry shader invocation. It is assigned integer values in the range [0, N-1], where N is the number of geometry shader invocations per primitive.
+
+I see gl_in[] is an array, does that mean I'm dealing with more than one input depending on how the vert shader works? To the [Geometry Shader Specification!](https://docs.vulkan.org/spec/latest/chapters/geometry.html)
+* The geometry shader operates on a group of vertices and their associated data assembled from a single input primitive, and emits zero or more output primitives and the group of vertices and their associated data required for each output primitive. 
+* Each geometry shader invocation has access to all vertices in the primitive (and their associated data), which are presented to the shader as an array of inputs.
+* The input primitive type expected by the geometry shader is specified with an OpExecutionMode instruction in the geometry shader, and must match the incoming primitive type specified by either the pipeline’s primitive topology if tessellation is inactive, or the tessellation mode if tessellation is active, as follows: (redacted)
+* our VulkPipelineBuilder assumes VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, so that's the topology right now.
+
+if the input is points, I need the output to be lines or something, how do I specify that?
+
+Okay, next steps:
+* DONE change our topology to VK_PRIMITIVE_TOPOLOGY_POINT_LIST in he normal pipeline
+* write the shaders
+    * x vert
+    * geom
+    * frag
+
+light the waves:
+* make the water material
+* calc pos and norm in world space and pass it through to frag shader from vert shader
+* add light and material to fragment shader and calculate ambience/diffuse/specular
 
 ## 12/30 More types of lights
 I'm not feeling more lights stuff right now, looks like more of what I've already done.

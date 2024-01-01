@@ -28,8 +28,16 @@ class LitLandAndWaves : public Vulk {
     struct MeshRenderInfo {
         VulkMeshRef meshRef; // what we're drawing
         std::vector<VulkActor> actors; // the actors that use this mesh
+
+        // render-related
+        VkDescriptorPool descriptorPool;
         std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets; // the per-frame descriptor sets
         std::array<VulkStorageBuffer<ActorSSBOElt>, MAX_FRAMES_IN_FLIGHT> ssbos; // the per-frame actor xforms
+
+        // for debugging
+        VkDescriptorPool normalsDescriptorPool;
+        std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> normalsDescriptorSets = {}; 
+
         void updateActorSSBO(uint32_t curFrame) {
             auto &res = ssbos[curFrame];
             for (int i = 0; i < actors.size(); i++) {
@@ -40,10 +48,11 @@ class LitLandAndWaves : public Vulk {
             for (auto &res : ssbos) {
                 res.cleanup(dev);
             }
+            vkDestroyDescriptorPool(dev, descriptorPool, nullptr);
+            vkDestroyDescriptorPool(dev, normalsDescriptorPool, nullptr);
         }
     };
     
-    VkDescriptorPool actorsDescriptorPool;
     std::unordered_map<char const *, MeshRenderInfo> meshActors;
 
     struct MeshRenderBuffers {
@@ -115,7 +124,7 @@ class LitLandAndWaves : public Vulk {
     };
     Material material = {
         {1.0f, 1.0f, 1.0f, 1.f},
-        {0.01f, 0.01f, 0.01f},
+        {0.02f, 0.02f, 0.02f},
         0.5f
     };
     VulkStorageBuffer<Material> materialsSSBO;
@@ -129,8 +138,8 @@ class LitLandAndWaves : public Vulk {
         float spotPower;        // spotlight only
     };
     Light light = {
-        {100.0f, 0.0f, 0.0f},
-        {1.0f, 1.0f, 1.0f, 1.0f},
+        {300.0f, 0.0f, 0.0f},
+        {.1f, .1f, .1f, 1.0f},
         0.0f,
         0.0f,
         {0.0f, 0.0f, 0.0f},
@@ -142,14 +151,26 @@ class LitLandAndWaves : public Vulk {
         return 0.3f * (v.pos.z * sinf(0.1f * v.pos.x) + v.pos.x * cosf(0.1f * v.pos.z));
     }
 
+    glm::vec3 getTerrainNormal(Vertex const &v) {
+        // given the terrain height function: 0.3f * (v.pos.z * sinf(0.1f * v.pos.x) + v.pos.x * cosf(0.1f * v.pos.z));
+        glm::vec3 tX = {1.0f, 0.1f * v.pos.z * cosf(0.1f * v.pos.x) - v.pos.x * 0.1f * sinf(0.1f * v.pos.z), 0};
+        glm::vec3 tZ = {0, 0.1f * v.pos.x * cosf(0.1f * v.pos.z) - v.pos.z * 0.1f * sinf(0.1f * v.pos.x), 1.0f};
+        return glm::normalize(glm::cross(tX, tZ));
+    }
+
+    bool renderNormals = true;
+    VkPipelineLayout normalsPipelineLayout;
+    VkDescriptorSetLayout normalsDescriptorSetLayout;
+    VkPipeline normalsPipeline;
 public:
     void init() override {
-        camera.lookAt(glm::vec3(0.f, 1.2f, 2.5f), glm::vec3(0.f, 0.f, 0.f));
+        camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
 
         VulkMesh terrain;
         makeGrid(160, 160, 50, 50, terrain);
         for (auto &v : terrain.vertices) {
             v.pos.y = getTerrainHeight(v);
+            v.normal = getTerrainNormal(v);
         }
 
         createTextureImage("Assets/Textures/uv_checker.png", textureImageMemory, textureImage);
@@ -180,13 +201,13 @@ public:
             .build(*this);
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/light.spv")
+            .addVertexShaderStage("Assets/Shaders/Vert/litTerrain.spv")
             .addVertexInputBindingDescription(0, sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/light.spv")
+            .addFragmentShaderStage("Assets/Shaders/Frag/litTerrain.spv")
             .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
 
         VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
@@ -196,22 +217,44 @@ public:
         };
 
         actorsRenderBuffers.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
-        uint32_t numMeshes = static_cast<uint32_t>(meshActors.size());
-        actorsDescriptorPool = VulkDescriptorPoolBuilder()
-            .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes * 2)
-            .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
-            .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes * 3)
-            .build(device, MAX_FRAMES_IN_FLIGHT * numMeshes);
+
+        // for debugging
+        normalsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+            .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_GEOMETRY_BIT)
+            .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_GEOMETRY_BIT)
+            .build(*this);
+
+        VulkPipelineBuilder(*this)
+            .addVertexShaderStage("Assets/Shaders/Vert/normals.spv") 
+            .setPrimitiveTopology(VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
+            .addGeometryShaderStage("Assets/Shaders/Geom/normals.spv") 
+            .addVertexInputBindingDescription(0, sizeof(Vertex))
+            .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
+            .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
+            .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
+            .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
+            .addFragmentShaderStage("Assets/Shaders/Frag/normals.spv")
+            // .setLineWidth(10.f)
+            .setCullMode(VK_CULL_MODE_NONE)
+            .setDepthTestEnabled(false)
+            .setDepthWriteEnabled(false)
+            .build(normalsDescriptorSetLayout, normalsPipelineLayout, normalsPipeline);        
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
             uint32_t numActors = static_cast<uint32_t>(meshRenderInfo.actors.size());
+            meshRenderInfo.descriptorPool = VulkDescriptorPoolBuilder()
+                .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 2)
+                .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
+                .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * 3)
+                .build(device, MAX_FRAMES_IN_FLIGHT);
+
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
                 // map the actor xforms into a mem-mapped SSBO
                 meshRenderInfo.ssbos[i].createAndMap(*this, numActors);
 
                 // create the descriptor set
-                meshRenderInfo.descriptorSets[i] = createDescriptorSet(actorsDescriptorSetLayout, actorsDescriptorPool);
+                meshRenderInfo.descriptorSets[i] = createDescriptorSet(actorsDescriptorSetLayout, meshRenderInfo.descriptorPool);
                 VulkDescriptorSetUpdater(meshRenderInfo.descriptorSets[i])
                     .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
                     .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
@@ -219,6 +262,20 @@ public:
                     .addStorageBuffer(meshRenderInfo.ssbos[i].buf, sizeof(ActorSSBOElt) * numActors, VulkShaderBinding_Actors)
                     .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
                     .addStorageBuffer(materialsSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
+                    .update(device);
+            }
+
+            // for debugging
+            meshRenderInfo.normalsDescriptorPool = VulkDescriptorPoolBuilder()
+                .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
+                .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT)
+                .build(device, MAX_FRAMES_IN_FLIGHT);
+
+            for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                meshRenderInfo.normalsDescriptorSets[i] = createDescriptorSet(normalsDescriptorSetLayout, meshRenderInfo.normalsDescriptorPool);
+                VulkDescriptorSetUpdater(meshRenderInfo.normalsDescriptorSets[i])
+                    .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
+                    .addStorageBuffer(meshRenderInfo.ssbos[i].buf, sizeof(ActorSSBOElt) * numActors, VulkShaderBinding_Actors)
                     .update(device);
             }
         }
@@ -258,7 +315,7 @@ public:
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             wavesDescriptorSets[i] = createDescriptorSet(wavesDescriptorSetLayout, wavesDescriptorPool);
             VulkDescriptorSetUpdater(wavesDescriptorSets[i])
-                .addUniformBuffer(xformsUBOs[i].buf, sizeof(xformsUBOs[i].getSize()), VulkShaderBinding_XformsUBO)
+                .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
                 .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
                 .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_Sampler)
                 .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
@@ -282,14 +339,15 @@ private:
     }
 
     std::chrono::steady_clock::time_point rotateWorldTimerStartTime = std::chrono::high_resolution_clock::now();
+    std::chrono::steady_clock::time_point pauseTime = std::chrono::high_resolution_clock::now();
     void updateXformsUBO(XformsUBO &ubo) {
         
         auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - rotateWorldTimerStartTime).count();
         if (!rotateWorld) {
-            time = 0.0f;
+            currentTime = pauseTime;
         }
-        ubo.world = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - rotateWorldTimerStartTime).count();
+        ubo.world = glm::rotate(glm::mat4(1.0f), 0.5f * time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         glm::vec3 fwd = camera.getForwardVec();
         glm::vec3 lookAt = camera.eye + fwd;
         glm::vec3 up = camera.getUpVec();
@@ -352,13 +410,13 @@ private:
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         // waves
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender[currentFrame].vertexBuffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, wavesRender[currentFrame].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
-        vkCmdDrawIndexed(commandBuffer, (uint32_t)wavesMesh.indices.size(), 1, 0, 0, 0);
+        // vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
+        // vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        // vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        // vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender[currentFrame].vertexBuffer, offsets);
+        // vkCmdBindIndexBuffer(commandBuffer, wavesRender[currentFrame].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        // vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
+        // vkCmdDrawIndexed(commandBuffer, (uint32_t)wavesMesh.indices.size(), 1, 0, 0, 0);
 
         // actors
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsGraphicsPipeline);
@@ -368,11 +426,26 @@ private:
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &actorsRenderBuffers.vertexBuffer, offsets);
         vkCmdBindIndexBuffer(commandBuffer, actorsRenderBuffers.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        for (auto &meshActor: meshActors) {
-            MeshRenderInfo &meshRenderInfo = meshActor.second;
-            meshRenderInfo.updateActorSSBO(currentFrame); // is this safe? need to understand synchroniation better...;
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &meshRenderInfo.descriptorSets[currentFrame], 0, nullptr);
-            vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
+        // for (auto &meshActor: meshActors) {
+        //     MeshRenderInfo &meshRenderInfo = meshActor.second;
+        //     meshRenderInfo.updateActorSSBO(currentFrame); // is this safe? need to understand synchroniation better...;
+        //     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsPipelineLayout, 0, 1, &meshRenderInfo.descriptorSets[currentFrame], 0, nullptr);
+        //     vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
+        // }
+
+        if (renderNormals) {
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, normalsPipeline);
+            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+            // vert and index buffers are not preserved across new pipelines (I think, I should double check)
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &actorsRenderBuffers.vertexBuffer, offsets);
+            vkCmdBindIndexBuffer(commandBuffer, actorsRenderBuffers.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+            for (auto &meshActor: meshActors) {
+                MeshRenderInfo &meshRenderInfo = meshActor.second;
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, normalsPipelineLayout, 0, 1, &meshRenderInfo.normalsDescriptorSets[currentFrame], 0, nullptr);
+                vkCmdDrawIndexed(commandBuffer, meshRenderInfo.meshRef.indexCount, (uint32_t)meshRenderInfo.actors.size(), meshRenderInfo.meshRef.firstIndex, meshRenderInfo.meshRef.firstVertex, 0);
+            }
         }
 
         vkCmdEndRenderPass(commandBuffer);
@@ -398,7 +471,6 @@ private:
         }
 
         vkDestroyDescriptorSetLayout(device, actorsDescriptorSetLayout, nullptr);
-        vkDestroyDescriptorPool(device, actorsDescriptorPool, nullptr);
         vkDestroySampler(device, textureSampler, nullptr);
         vkDestroyImageView(device, textureImageView, nullptr);
         vkDestroyImage(device, textureImage, nullptr);
@@ -414,6 +486,10 @@ private:
         for (auto &render : wavesRender) {
             render.cleanup(*this);
         }
+
+        vkDestroyDescriptorSetLayout(device, normalsDescriptorSetLayout, nullptr);
+        vkDestroyPipeline(device, normalsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, normalsPipelineLayout, nullptr);
     }
 
     void keyCallback(int key, int scancode, int action, int mods) {
@@ -443,6 +519,13 @@ private:
                 camera.pitch += 15.0f;
             } else if (key == GLFW_KEY_DOWN) {
                 camera.pitch -= 15.0f;
+            } else if (key == GLFW_KEY_SPACE) {
+                if (rotateWorld) {
+                    pauseTime = std::chrono::high_resolution_clock::now();
+                } else {
+                    rotateWorldTimerStartTime += std::chrono::high_resolution_clock::now() - pauseTime;
+                }
+                rotateWorld = !rotateWorld;
             } else {
                 handled = false;
             }
