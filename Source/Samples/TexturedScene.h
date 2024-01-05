@@ -9,7 +9,7 @@
 #include "Vulk/VulkUniformBuffer.h"
 #include "Vulk/VulkStorageBuffer.h"
 
-class LitLandAndWaves : public Vulk {
+class TexturedScene : public Vulk {
     VulkCamera camera;
 
     struct XformsUBO {
@@ -125,7 +125,7 @@ class LitLandAndWaves : public Vulk {
     Material material = {
         {0.004f, 0.20f, 0.40f, .2f},
         {0.02f, 0.02f, 0.02f},
-        0.5f
+        0.8f
     };
     VulkStorageBuffer<Material> materialsSSBO;
 
@@ -138,7 +138,7 @@ class LitLandAndWaves : public Vulk {
         float spotPower;        // spotlight only
     };
     Light light = {
-        {300.0f, 300.0f, 0.0f},
+        {600.0f, 300.0f, 0.0f},
         {.3f, .3f, .2f, 1.0f},
         0.0f,
         0.0f,
@@ -205,13 +205,13 @@ public:
             .build(*this);
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/litTerrain.spv")
+            .addVertexShaderStage("Assets/Shaders/Vert/litTexturedTerrain.spv")
             .addVertexInputBindingDescription(0, sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/litTerrain.spv")
+            .addFragmentShaderStage("Assets/Shaders/Frag/litTexturedTerrain.spv")
             .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
 
         // test normal rendering: do something a little simpler
@@ -224,7 +224,7 @@ public:
         // };
 
         VulkMesh terrain;
-        makeGrid(160, 160, 50, 50, terrain);
+        makeGrid(160, 160, 50, 50, terrain, 4, 4);
         for (auto &v : terrain.vertices) {
             v.pos.y = getTerrainHeight(v);
             v.normal = getTerrainNormal(v);

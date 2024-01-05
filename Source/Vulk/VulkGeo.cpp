@@ -338,7 +338,7 @@ void makeAxes(float length, VulkMesh &meshData) {
     meshData.appendMesh(z);
 }
 
-void makeGrid(float width, float depth, uint32_t m, uint32_t n, VulkMesh &meshData) {
+void makeGrid(float width, float depth, uint32_t m, uint32_t n, VulkMesh &meshData, float repeatU, float repeatV) {
     uint32_t vertexCount = m*n;
     uint32_t faceCount = (m-1)*(n-1)*2;
 
@@ -349,8 +349,8 @@ void makeGrid(float width, float depth, uint32_t m, uint32_t n, VulkMesh &meshDa
     float dx = width / (n-1);
     float dz = depth / (m-1);
 
-    float du = 1.0f / (n-1);
-    float dv = 1.0f / (m-1);
+    float du = repeatU / (n-1);
+    float dv = repeatV / (m-1);
 
     meshData.vertices.resize(vertexCount);
     for(uint32_t i = 0; i < m; ++i)

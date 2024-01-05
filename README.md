@@ -41,17 +41,76 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 1/5/24 Lit Textures
+![](Assets/Screenshots/lit_textured_grass.png)
+The very basic diffuse part of the grass texture is being rendered. I changed the terrain coloration to blend between it and the "snow" so it looks a tad smoother.
+
+This still looks like shiny plastic. given the basic lighting model I think that's about all I can do for now. 
+
+## 1/1/24 Textures
+let's keep working on our land and waves scene:
+* set up 
+* grass textures
+    * get it: https://cc0-textures.com/t/cc0t-grass-001
+    * load it
+    * texture the terrain
+* add a moving water texture
+
+
+### Grass 'texture' from https://cc0-textures.com/t/cc0t-grass-001
+
+This had a zip file with the following, here are the descriptions according to ChatGPT:
+* Grass001_4K_Color.jpg : This is the color map (also known as a diffuse map). It's the basic texture that you apply to a model.
+* Grass001_4K-JPG.usda / Grass001_4K-JPG.usdc: These are Universal Scene Description (USD) files. USD is a framework for interchange of 3D graphics data, and it's used in the animation and VFX industry. The .usda format is ASCII, and .usdc is binary.
+* Grass001_4K_AmbientOcclusion.jpg : This is an Ambient Occlusion (AO) map
+* Grass001_4K_Displacement.jpg : This is a displacement map, which is a type of texture used to add detail at render time. It actually modifies the geometry of the model when it's rendered.
+* Grass001_4K_NormalDX.jpg / Grass001_4K_NormalGL.jpg: These are normal maps. They are used to add details without using more polygons. A normal map is a texture that stores a direction at each pixel. These directions are called normals. DX and GL refer to DirectX and OpenGL, which are two different ways of interpreting the data in the normal map.
+* Grass001_4K_Roughness.jpg : This is a roughness map, which is used in physically based rendering (PBR) engines to determine how rough or smooth a surface is. This affects how it reflects light.
+* Grass001_PREVIEW.jpg : This is a preview image of the texture. 
+
+Let me start with the diffuse (Grass001_4K_Color.jpg) map, but I should incorporate these other parts as well
+![](Assets/Screenshots/grass_on_sphere.png)
+
+Now let's stick it on the terrain. I need to check te uvs to see what's going on
+
+
+### Filtering (scaling textures up and down)
+
+There are four basic kinds of filtering for textures:
+* Nearest-Neighbor Filtering: The simplest form of texture filtering. It selects the nearest pixel (texel) from the texture to the pixel being rendered. While fast and easy to implement, it can result in a blocky and pixelated image, especially when the texture is viewed at a steep angle or from a great distance.
+* Bilinear Filtering: A more advanced method that determines the color of a pixel by taking an average of the four closest texels. This results in smoother images compared to nearest-neighbor filtering, but it can still produce noticeable blurring, especially in minification (when textures appear smaller than their actual size).
+* Trilinear Filtering: An enhancement over bilinear filtering that performs linear interpolation between two mipmap levels. Mipmaps are pre-calculated, optimized sequences of images that represent the texture at different resolutions. Trilinear filtering reduces the aliasing and moiré patterns seen in bilinear filtering by smoothly transitioning between mipmap levels.
+* Anisotropic Filtering: The most sophisticated and effective method for texture filtering. It accounts for the angle of the viewer's perspective and applies varying degrees of filtering accordingly. This results in textures that look good from all angles and distances, significantly reducing blurring and preserving detail, especially in textures viewed at glancing angles.
+
+### Texture Addressing Modes:
+
+Texture address modes determine how texture coordinates outside the [0, 1] range are handled:
+* Clamp: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE and VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER. CLAMP_TO_EDGE will clamp coordinates to the very edge of the texture, while CLAMP_TO_BORDER allows you to define a border color for any coordinates outside the texture range.
+* Repeat (or Wrap): VK_SAMPLER_ADDRESS_MODE_REPEAT. When texture coordinates outside the [0, 1] range are encountered, the texture will be repeated.
+* Mirror (or Mirror Repeat): VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT. It mirrors the texture at every integer junction, so the texture flips at 0, 1, 2, etc.
+* Border: VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER provides this functionality, allowing you to set a specific border color for coordinates outside the [0, 1] range.
+
+### Texture Format
+
+it looks like Vulkan likes KTX or KTX2 textures. https://www.khronos.org/ktx/ has this to say: 
+
+    KTX (Khronos Texture) is an efficient, lightweight container format for reliably distributing GPU textures to diverse platforms and applications. The contents of a KTX file can range from a simple base-level 2D texture to a cubemap array texture with mipmaps. KTX files hold all the parameters needed for efficient texture loading into 3D APIs such as OpenGL® and Vulkan®, including access to individual mipmap levels
+
+    KTX 2.0 adds support for Basis Universal supercompressed GPU textures. Developed by Binomial, this compression technology produces compact textures that can be efficiently transcoded to a variety of GPU compressed texture formats at run-time. Additionally, Khronos has released the KHR_texture_basisu extension that enables glTF to contain KTX 2.0 textures, resulting in universally distributable glTF assets that reduce download size and use natively supported texture formats to reduce GPU memory size and boost rendering speed on diverse devices and platforms.
+
+I have no idea who Binomial is, or what most of this means. let's not pay too much attention to it for now.
+
 ## 1/1/24 Lit land and waves
 ![](Assets/Screenshots/lit_land_and_waves.png)
 
-Behold the most beautiful land and waves render you could imagine.
-
-* x normals on waves
-* x material for waves
+Behold the most beautiful land and waves render you could imagine. To be fair when I check back to 12/28 this does appear significantly better (unless you like that flat shaded look)
 
 
+Same scene with some different roughness values:
+![](Assets/Screenshots/high_and_low_roughness_terrain.png)
 
-## 1/1/24 Lit land
+
+## 1/1/24 Lit land - Fix Broken Normals
 
 ![](Assets/Screenshots/terrain_normals.png)
 
@@ -74,7 +133,7 @@ Plugging this into our terrain equation is fairly straightforward, and we get:
 ![](Assets/Screenshots/terrain_normals_correct.png)
 
 
-
+Looks good! moving on
 
 ## 1/1/24 Normals rendering
 Happy new year!

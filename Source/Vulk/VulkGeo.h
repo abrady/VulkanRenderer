@@ -22,4 +22,4 @@ void makeCylinder(float height, float bottomRadius, float topRadius, uint32_t nu
 void makeGeoSphere(float radius, uint32_t numSubdivisions, VulkMesh &meshData);
 void makeAxes(float length, VulkMesh &meshData);
 
-void makeGrid(float width, float depth, uint32_t m, uint32_t n, VulkMesh &meshData);
+void makeGrid(float width, float depth, uint32_t m, uint32_t n, VulkMesh &meshData, float repeatU = 1.0f, float repeatV = 1.0f);
