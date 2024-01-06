@@ -122,7 +122,22 @@ VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputFieldVec2(uint32_t bindi
     return addVertexInputField(binding, location, offset, VK_FORMAT_R32G32_SFLOAT);
 }
 
-void VulkPipelineBuilder::build(VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout &pipelineLayout, VkPipeline &graphicsPipeline)
+VulkPipelineBuilder& VulkPipelineBuilder::setBlendingEnabled(bool enabled, VkColorComponentFlags colorWriteMask)
+{
+    colorBlendAttachment.blendEnable = enabled;
+    if (enabled) {
+        colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+        colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    }
+    colorBlendAttachment.colorWriteMask = colorWriteMask;
+    return *this;
+}
+
+void VulkPipelineBuilder::build(VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout *pipelineLayout, VkPipeline *graphicsPipeline)
 {
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -135,7 +150,7 @@ void VulkPipelineBuilder::build(VkDescriptorSetLayout descriptorSetLayout, VkPip
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 
-    VK_CALL(vkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
+    VK_CALL(vkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, nullptr, pipelineLayout));
 
     VkPipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -154,12 +169,12 @@ void VulkPipelineBuilder::build(VkDescriptorSetLayout descriptorSetLayout, VkPip
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.layout = pipelineLayout;
+    pipelineInfo.layout = *pipelineLayout;
     pipelineInfo.renderPass = vk.renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    VK_CALL(vkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline));
+    VK_CALL(vkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, graphicsPipeline));
 
     for (auto shaderModule : shaderModules) {
         vkDestroyShaderModule(vk.device, shaderModule, nullptr);

@@ -173,7 +173,7 @@ public:
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
             .addFragmentShaderStage("Assets/Shaders/Frag/terrain.spv")
-            .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
+            .build(actorsDescriptorSetLayout, &actorsPipelineLayout, &actorsGraphicsPipeline);
 
         VulkMeshRef terrainRef = meshAccumulator.appendMesh(terrain);
         meshActors["terrain"] = {
@@ -228,7 +228,7 @@ public:
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
             .addFragmentShaderStage("Assets/Shaders/Frag/waves.spv")
-            .build(wavesDescriptorSetLayout, wavesPipelineLayout, wavesGraphicsPipeline);
+            .build(wavesDescriptorSetLayout, &wavesPipelineLayout, &wavesGraphicsPipeline);
 
         wavesDescriptorPool = VulkDescriptorPoolBuilder()
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)

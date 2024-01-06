@@ -155,7 +155,7 @@ public:
         actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .addSampler(VulkShaderBinding_Sampler)
+            .addSampler(VulkShaderBinding_TextureSampler)
             .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_VERTEX_BIT)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -169,7 +169,7 @@ public:
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
             .addFragmentShaderStage("Assets/Shaders/Frag/light.spv")
-            .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
+            .build(actorsDescriptorSetLayout, &actorsPipelineLayout, &actorsGraphicsPipeline);
 
         VulkMesh sphere;
         makeGeoSphere(1.f, 3, sphere);
@@ -199,7 +199,7 @@ public:
                 VulkDescriptorSetUpdater(meshRenderInfo.descriptorSets[i])
                     .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
                     .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
-                    .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_Sampler)
+                    .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_TextureSampler)
                     .addStorageBuffer(meshRenderInfo.ssbos[i].buf, sizeof(ActorSSBOElt) * numActors, VulkShaderBinding_Actors)
                     .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
                     .addStorageBuffer(materialsSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)

@@ -198,7 +198,7 @@ public:
         actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .addSampler(VulkShaderBinding_Sampler)
+            .addSampler(VulkShaderBinding_TextureSampler)
             .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_VERTEX_BIT)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -212,7 +212,7 @@ public:
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
             .addFragmentShaderStage("Assets/Shaders/Frag/litTerrain.spv")
-            .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
+            .build(actorsDescriptorSetLayout, &actorsPipelineLayout, &actorsGraphicsPipeline);
 
         // test normal rendering: do something a little simpler
         // camera.lookAt(glm::vec3(0.f, 0.f, 2.1f), glm::vec3(0.f, 0.f, 0.f));
@@ -258,7 +258,7 @@ public:
             .setCullMode(VK_CULL_MODE_NONE)
             // .setDepthTestEnabled(false)
             .setDepthWriteEnabled(false)
-            .build(normalsDescriptorSetLayout, normalsPipelineLayout, normalsPipeline);        
+            .build(normalsDescriptorSetLayout, &normalsPipelineLayout, &normalsPipeline);        
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
@@ -278,7 +278,7 @@ public:
                 VulkDescriptorSetUpdater(meshRenderInfo.descriptorSets[i])
                     .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
                     .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
-                    .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_Sampler)
+                    .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_TextureSampler)
                     .addStorageBuffer(meshRenderInfo.ssbos[i].buf, sizeof(ActorSSBOElt) * numActors, VulkShaderBinding_Actors)
                     .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
                     .addStorageBuffer(materialsSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
@@ -311,7 +311,7 @@ public:
         wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .addSampler(VulkShaderBinding_Sampler)
+            .addSampler(VulkShaderBinding_TextureSampler)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(*this);
@@ -324,7 +324,7 @@ public:
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
             .addFragmentShaderStage("Assets/Shaders/Frag/litwaves.spv")
-            .build(wavesDescriptorSetLayout, wavesPipelineLayout, wavesGraphicsPipeline);
+            .build(wavesDescriptorSetLayout, &wavesPipelineLayout, &wavesGraphicsPipeline);
 
         wavesDescriptorPool = VulkDescriptorPoolBuilder()
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 2)
@@ -337,7 +337,7 @@ public:
             VulkDescriptorSetUpdater(wavesDescriptorSets[i])
                 .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
                 .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
-                .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_Sampler)
+                .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_TextureSampler)
                 .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
                 .addStorageBuffer(materialsSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
                 .update(device);

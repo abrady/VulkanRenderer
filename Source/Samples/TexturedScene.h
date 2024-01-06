@@ -110,9 +110,25 @@ class TexturedScene : public Vulk {
             return VulkMeshRef{mesh.name, vertexOffset, indexOffset, static_cast<uint32_t>(mesh.indices.size())};
         }
     } meshAccumulator;
-    VkImage textureImage;
-    VkDeviceMemory textureImageMemory;
-    VkImageView textureImageView;
+
+    struct TextureView {
+        VkImage textureImage;
+        VkDeviceMemory textureImageMemory;
+        VkImageView textureImageView;
+
+        void init(Vulk &vk, char const *texturePath) {
+            vk.createTextureImage(texturePath, textureImageMemory, textureImage);
+            textureImageView = vk.createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+        }
+
+        void cleanup(Vulk &vk) {
+            vkDestroyImageView(vk.device, textureImageView, nullptr);
+            vkDestroyImage(vk.device, textureImage, nullptr);
+            vkFreeMemory(vk.device, textureImageMemory, nullptr);
+        }
+    };
+
+    TextureView beachTextureView, grassTextureView, snowTextureView, wavesTextureView;
     VkSampler textureSampler;
 
     bool rotateWorld = true;
@@ -122,25 +138,33 @@ class TexturedScene : public Vulk {
         glm::vec3 fresnelR0;
         float roughness;
     };
-    Material material = {
-        {0.004f, 0.20f, 0.40f, .2f},
-        {0.02f, 0.02f, 0.02f},
-        0.8f
+    Material terrainMaterial = {
+        {0.9f, 0.9f, 0.9f, 1.0f},
+        {0.05f, 0.05f, 0.05f},
+        1.0f
     };
-    VulkStorageBuffer<Material> materialsSSBO;
+    VulkStorageBuffer<Material> terrainSSBO;
+
+    Material wavesMaterial = {
+        {0.9f, 0.9f, 0.9f, .5f},
+        {0.02f, 0.02f, 0.02f},
+        0.5f
+    };
+    VulkStorageBuffer<Material> wavesSSBO;
 
     struct Light {
         glm::vec3 pos;          // point light only
-        glm::vec4 color;        // color of light
         float falloffStart;     // point/spot light only
+        glm::vec3 color;        // color of light
         float falloffEnd;       // point/spot light only: negative means no falloff 
         glm::vec3 direction;    // directional/spot light only
         float spotPower;        // spotlight only
     };
     Light light = {
         {600.0f, 300.0f, 0.0f},
-        {.3f, .3f, .2f, 1.0f},
         0.0f,
+        {.7f, .7f, .5f},
+        //{0.f, 0.f, 0.f},
         0.0f,
         {0.0f, 0.0f, 0.0f},
         0.0f,
@@ -170,6 +194,7 @@ class TexturedScene : public Vulk {
     }
 
     bool renderNormals = false;
+    bool renderWaves = true;
     VkPipelineLayout normalsPipelineLayout;
     VkDescriptorSetLayout normalsDescriptorSetLayout;
     VkPipeline normalsPipeline;
@@ -177,9 +202,13 @@ public:
     void init() override {
         camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
 
-        createTextureImage("Assets/Textures/Grass/Grass001_4K_Color.jpg", textureImageMemory, textureImage);
-        textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+        beachTextureView.init(*this, "Assets/Textures/aerial_beach_01/aerial_beach_01_diff_4k.jpg");
+        grassTextureView.init(*this, "Assets/Textures/aerial_rocks_02/aerial_rocks_02_diff_4k.jpg");
+        snowTextureView.init(*this, "Assets/Textures/snow_02/snow_02_diff_4k.jpg");
         textureSampler = createTextureSampler();
+
+        wavesTextureView.init(*this, "Assets/Textures/sea_water_2048x2048.png");
+
         for (auto &ubo: xformsUBOs) {
             ubo.createUniformBuffers(*this);
         }
@@ -188,8 +217,10 @@ public:
         }
 
         // create the materials SSBO
-        materialsSSBO.createAndMap(*this, 1);
-        materialsSSBO.mappedObjs[0] = material;
+        terrainSSBO.createAndMap(*this, 1);
+        terrainSSBO.mappedObjs[0] = terrainMaterial;
+        wavesSSBO.createAndMap(*this, 1);
+        wavesSSBO.mappedObjs[0] = wavesMaterial;
 
         // create the lights SSBO
         lightSSBO.createAndMap(*this, 1);
@@ -198,7 +229,9 @@ public:
         actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .addSampler(VulkShaderBinding_Sampler)
+            .addSampler(VulkShaderBinding_TextureSampler)
+            .addSampler(VulkShaderBinding_TextureSampler2)
+            .addSampler(VulkShaderBinding_TextureSampler3)
             .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_VERTEX_BIT)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -212,7 +245,7 @@ public:
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
             .addFragmentShaderStage("Assets/Shaders/Frag/litTexturedTerrain.spv")
-            .build(actorsDescriptorSetLayout, actorsPipelineLayout, actorsGraphicsPipeline);
+            .build(actorsDescriptorSetLayout, &actorsPipelineLayout, &actorsGraphicsPipeline);
 
         // test normal rendering: do something a little simpler
         // camera.lookAt(glm::vec3(0.f, 0.f, 2.1f), glm::vec3(0.f, 0.f, 0.f));
@@ -258,14 +291,14 @@ public:
             .setCullMode(VK_CULL_MODE_NONE)
             // .setDepthTestEnabled(false)
             .setDepthWriteEnabled(false)
-            .build(normalsDescriptorSetLayout, normalsPipelineLayout, normalsPipeline);        
+            .build(normalsDescriptorSetLayout, &normalsPipelineLayout, &normalsPipeline);        
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
             uint32_t numActors = static_cast<uint32_t>(meshRenderInfo.actors.size());
             meshRenderInfo.descriptorPool = VulkDescriptorPoolBuilder()
                 .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 2)
-                .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
+                .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * 3)
                 .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * 3)
                 .build(device, MAX_FRAMES_IN_FLIGHT);
 
@@ -278,10 +311,12 @@ public:
                 VulkDescriptorSetUpdater(meshRenderInfo.descriptorSets[i])
                     .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
                     .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
-                    .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_Sampler)
+                    .addImageSampler(beachTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler)
+                    .addImageSampler(grassTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler2)
+                    .addImageSampler(snowTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler3)
                     .addStorageBuffer(meshRenderInfo.ssbos[i].buf, sizeof(ActorSSBOElt) * numActors, VulkShaderBinding_Actors)
                     .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
-                    .addStorageBuffer(materialsSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
+                    .addStorageBuffer(terrainSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
                     .update(device);
             }
 
@@ -311,20 +346,21 @@ public:
         wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .addSampler(VulkShaderBinding_Sampler)
+            .addSampler(VulkShaderBinding_TextureSampler)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(*this);
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/litwaves.spv")
+            .addVertexShaderStage("Assets/Shaders/Vert/litTexturedWaves.spv")
             .addVertexInputBindingDescription(0,sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/litwaves.spv")
-            .build(wavesDescriptorSetLayout, wavesPipelineLayout, wavesGraphicsPipeline);
+            .addFragmentShaderStage("Assets/Shaders/Frag/litTexturedWaves.spv")
+            .setBlendingEnabled(true)
+            .build(wavesDescriptorSetLayout, &wavesPipelineLayout, &wavesGraphicsPipeline);
 
         wavesDescriptorPool = VulkDescriptorPoolBuilder()
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 2)
@@ -337,9 +373,9 @@ public:
             VulkDescriptorSetUpdater(wavesDescriptorSets[i])
                 .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
                 .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
-                .addImageSampler(textureImageView, textureSampler, VulkShaderBinding_Sampler)
+                .addImageSampler(wavesTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler)
                 .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
-                .addStorageBuffer(materialsSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
+                .addStorageBuffer(wavesSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
                 .update(device);
         }
     }
@@ -382,7 +418,7 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - updateWavesStartTime).count();
 
         for (auto &v : wavesMesh.vertices) {
-            v.pos.y = 0.05f * (v.pos.z * sinf(0.1f * v.pos.x + time) + v.pos.x * cosf(0.1f * v.pos.z + time));
+            v.pos.y = 0.05f * (v.pos.z * sinf(0.1f * v.pos.x + time) + v.pos.x * cosf(0.1f * v.pos.z + time)) - 10.0f;
 
             // take instantaneous partial derivatives to get the normal
             float dydx = 0.05f * (0.1f * v.pos.z * cosf(0.1f * v.pos.x + time) + cosf(0.1f * v.pos.z + time));
@@ -434,15 +470,6 @@ private:
 
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-        // waves
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender[currentFrame].vertexBuffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, wavesRender[currentFrame].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
-        vkCmdDrawIndexed(commandBuffer, (uint32_t)wavesMesh.indices.size(), 1, 0, 0, 0);
-
         // actors
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, actorsGraphicsPipeline);
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -473,6 +500,17 @@ private:
             }
         }
 
+        // waves
+        if (renderWaves) {
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesGraphicsPipeline);
+            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wavesRender[currentFrame].vertexBuffer, offsets);
+            vkCmdBindIndexBuffer(commandBuffer, wavesRender[currentFrame].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wavesPipelineLayout, 0, 1, &wavesDescriptorSets[currentFrame], 0, nullptr);
+            vkCmdDrawIndexed(commandBuffer, (uint32_t)wavesMesh.indices.size(), 1, 0, 0, 0);
+        }
+
         vkCmdEndRenderPass(commandBuffer);
 
         VK_CALL(vkEndCommandBuffer(commandBuffer));
@@ -496,12 +534,14 @@ private:
         }
 
         vkDestroyDescriptorSetLayout(device, actorsDescriptorSetLayout, nullptr);
+        beachTextureView.cleanup(*this);
+        grassTextureView.cleanup(*this);
+        snowTextureView.cleanup(*this);
+        wavesTextureView.cleanup(*this);
         vkDestroySampler(device, textureSampler, nullptr);
-        vkDestroyImageView(device, textureImageView, nullptr);
-        vkDestroyImage(device, textureImage, nullptr);
-        vkFreeMemory(device, textureImageMemory, nullptr);
         actorsRenderBuffers.cleanup(*this);
-        materialsSSBO.cleanup(device);
+        terrainSSBO.cleanup(device);
+        wavesSSBO.cleanup(device);
         lightSSBO.cleanup(device);
 
         vkDestroyDescriptorSetLayout(device, wavesDescriptorSetLayout, nullptr);

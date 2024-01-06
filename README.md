@@ -32,16 +32,38 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 * run `cmake -S . -B build` from the root of the project
 
 # TODOs
-* I've been sloppy naming structs: MeshRender, MeshRenderInfo, MeshFrameResources: make this more coherent
-* tests for lighting? I'm vaguely nervous about math errors and having something that looks fine to my untrained eye but is actually wrong.
 * it feels like the descriptor set layout could inform the descriptor pool allocator and descriptor set updater...
     * maybe we can have an 'addVertexBindings' for VulkPipelineBuilder that just does that boilerplate.
-* glslc includes must be a thing, I should look into that for some constants
-* 
+
+* need per-actor materials:
+    * x update descriptors set layout
+    * x make sure the pool has enough to allocate
+    * x update the descriptor set
 
 # Log
 
-## 1/5/24 Lit Textures
+## 1/6/24 More textures:
+Despite looking like crappy plastic this is apparently the best I can do with my current lighting model. 
+let's add a snow and beach texture and see if we can't make it look a bit better. plus I can practice binding multiple shaders
+* load and bind a beach and snow texture (and replace the grass I found with the terrain texture I downloaded)
+* apply it by height
+* take a few passes at making the rendering looka little better
+
+![](Assets/Screenshots/blended_textured_lit_terrain.png)
+So this still looks like plastic, but it blends three textures: a beach/mountain terrain/snow texture and looks marginally better. this could be used in an early 90s 3D game.
+
+Let's get the water in, done.
+
+Hmm, the water isn't transparent like I'd like. why is that?
+* how is the pipeline blending things?
+* VkPipelineColorBlendAttachmentState has this set to false by default in the pipeline builder - fixed
+
+![](Assets/Screenshots/lit_textured_scene_transparent_water.png)
+
+hey! not the most terrible looking thing in the world. 
+
+
+## 1/5/24 Lit Textured Land
 ![](Assets/Screenshots/lit_textured_grass.png)
 The very basic diffuse part of the grass texture is being rendered. I changed the terrain coloration to blend between it and the "snow" so it looks a tad smoother.
 
@@ -617,3 +639,4 @@ Glossary
 
 TODOS (Closed)
 * why does each actor's mesh need its own descriptorset again? because of how I'm doing instancing: the xform for each actor is offset from 0 from the SSBO xform buf. This could just be one big buffer that we use an instance offset for as well (and that's probably the 'right' way to do it), this is just how I did it
+* glslc includes must be a thing, I should look into that for some constants/lighting functionality

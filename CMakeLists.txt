@@ -32,7 +32,7 @@ add_compile_options(-W3)
 # TODO: configure so it will work for release builds too
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(TARGET_DIR "${CMAKE_BINARY_DIR}/Debug") 
-    set(GLSLC_FLAGS "-g" "-O0") # build debug symbols and turn off optimizations
+    set(GLSLC_FLAGS "-g" "-O0" "-I${CMAKE_SOURCE_DIR}/Source/Shaders/Common") # build debug symbols and turn off optimizations
 endif()
 
 ##############################################################################
@@ -111,6 +111,9 @@ add_custom_target(
 ## Shaders
 ##############################################################################
 
+# TODO: glslc has a -M option that will print a makefile dependency, so we could use that instead of globbing
+file(GLOB SHADER_COMMON_FILES "${CMAKE_SOURCE_DIR}/Source/Shaders/Common/*")
+
 # Set the source and destination directories
 set(SHADER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/Source/Shaders")
 set(SHADER_DEST_DIR "${TARGET_DIR}/Assets/Shaders") 
@@ -120,14 +123,14 @@ file(MAKE_DIRECTORY ${SHADER_DEST_DIR})
 
 # Compile vertex shaders
 file(MAKE_DIRECTORY ${SHADER_DEST_DIR}/Vert)
-file(GLOB_RECURSE VERTEX_SHADERS CONFIGURE_DEPENDS "${SHADER_SOURCE_DIR}/vert/*")
+file(GLOB_RECURSE VERTEX_SHADERS CONFIGURE_DEPENDS "${SHADER_SOURCE_DIR}/Vert/*")
 foreach(SHADER ${VERTEX_SHADERS})
     get_filename_component(SHADER_NAME ${SHADER} NAME_WE)
-    set(SHADER_OUTPUT "${SHADER_DEST_DIR}/vert/${SHADER_NAME}.spv")
+    set(SHADER_OUTPUT "${SHADER_DEST_DIR}/Vert/${SHADER_NAME}.spv")
     add_custom_command(
         OUTPUT "${SHADER_OUTPUT}"
         COMMAND glslc ${GLSLC_FLAGS} "${SHADER}" -o "${SHADER_OUTPUT}"
-        DEPENDS ${SHADER}
+        DEPENDS ${SHADER} ${SHADER_COMMON_FILES}
         COMMENT "building vertex shader ${SHADER}"
     )
     list(APPEND COMPILED_SHADERS "${SHADER_OUTPUT}")
@@ -141,13 +144,13 @@ foreach(SHADER ${FRAGMENT_SHADERS})
     add_custom_command(
         OUTPUT "${SHADER_OUTPUT}"
         COMMAND glslc ${GLSLC_FLAGS} "${SHADER}" -o "${SHADER_OUTPUT}"
-        DEPENDS ${SHADER}
+        DEPENDS ${SHADER} ${SHADER_COMMON_FILES}
         COMMENT "building fragment shader ${SHADER}"
     )
     list(APPEND COMPILED_SHADERS "${SHADER_OUTPUT}")
 endforeach()
 
-# Compile fragment shaders
+# Compile Geometry shaders
 file(MAKE_DIRECTORY ${SHADER_DEST_DIR}/Tess)
 file(GLOB_RECURSE GEOMETRY_SHADERS CONFIGURE_DEPENDS "${SHADER_SOURCE_DIR}/Geom/*")
 foreach(SHADER ${GEOMETRY_SHADERS})
@@ -156,7 +159,7 @@ foreach(SHADER ${GEOMETRY_SHADERS})
     add_custom_command(
         OUTPUT "${SHADER_OUTPUT}"
         COMMAND glslc ${GLSLC_FLAGS} "${SHADER}" -o "${SHADER_OUTPUT}"
-        DEPENDS ${SHADER}
+        DEPENDS ${SHADER} ${SHADER_COMMON_FILES}
         COMMENT "building geometry shader ${SHADER}"
     )
     list(APPEND COMPILED_SHADERS "${SHADER_OUTPUT}")

@@ -47,14 +47,17 @@ do { \
     } \
 } while (0)
 
+// keep in sync with Source\Shaders\Common\common.glsl
 enum VulkShaderBindings {
     VulkShaderBinding_XformsUBO = 0,
-    VulkShaderBinding_Sampler = 1,
+    VulkShaderBinding_TextureSampler = 1,
     VulkShaderBinding_Actors = 2,
     VulkShaderBinding_Lights = 3,
     VulkShaderBinding_Materials = 4,
     VulkShaderBinding_EyePos = 5,
-    VulkShaderBinding_NumBindings = 6,
+    VulkShaderBinding_TextureSampler2 = 6,
+    VulkShaderBinding_TextureSampler3 = 7,
+    VulkShaderBinding_MaxBindingID,
 };
 
 
