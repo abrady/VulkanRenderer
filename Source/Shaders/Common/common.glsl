@@ -8,6 +8,7 @@ const int VulkShaderBinding_Materials = 4;
 const int VulkShaderBinding_EyePos = 5;
 const int VulkShaderBinding_TextureSampler2 = 6;
 const int VulkShaderBinding_TextureSampler3 = 7;
+const int VulkShaderBinding_WavesXform = 8;
 
 // note that the order matters here: it allows this to be packed into 3 vec4s
 struct Light {

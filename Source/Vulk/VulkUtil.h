@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <chrono>
 #include <vector>
+#include <cmath>
 #include <cstring>
 #include <cstdlib>
 #include <cstdint>
@@ -36,7 +37,6 @@
 #include <vulkan/vk_enum_string_helper.h>
 
 #include "VulkDescriptorSetLayoutBuilder.h"
-#include "VulkDescriptorSetUpdater.h"
 
 #define VK_CALL(func) \
 do { \
@@ -57,6 +57,7 @@ enum VulkShaderBindings {
     VulkShaderBinding_EyePos = 5,
     VulkShaderBinding_TextureSampler2 = 6,
     VulkShaderBinding_TextureSampler3 = 7,
+    VulkShaderBinding_WavesXform = 8,
     VulkShaderBinding_MaxBindingID,
 };
 

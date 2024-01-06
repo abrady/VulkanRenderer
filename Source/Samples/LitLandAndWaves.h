@@ -8,6 +8,7 @@
 #include "Vulk/VulkDescriptorPoolBuilder.h"
 #include "Vulk/VulkUniformBuffer.h"
 #include "Vulk/VulkStorageBuffer.h"
+#include "Vulk/VulkDescriptorSetUpdater.h"
 
 class LitLandAndWaves : public Vulk {
     VulkCamera camera;

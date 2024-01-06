@@ -42,6 +42,64 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 1/6/24 uv transforms: make the water move
+
+
+* passing in a mat3 ssbo
+* hmm, its getting corrupted somehow, probably alignment. I should figure this out.
+* looks like 'layout qualifiers' might be the answer (or just using a mat4, but let's see if we can make it work)
+
+### [4.4. Layout Qualifiers](https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.60.html#layout-qualifiers)
+
+    Layout qualifiers can appear in several forms of declaration. They can appear as part of an interface block definition or block member, as shown in the grammar in the previous section. They can also appear with just an interface-qualifier to establish layouts of other declarations made with that qualifier:
+
+The qualifiers are:
+- **`std140` & `std430`:**
+  - **`std140`:** Used with uniform blocks with stricter alignment rules.
+    - Vectors are aligned to 16 bytes.
+    - Each element in an array of `N` elements is aligned to `16 * N` bytes.
+    - Scalars and Vectors: Each element (scalar or vector) is aligned to the size of a vec4 (16 bytes). This means even a float (which is 4 bytes) will start at a 16-byte boundary.
+    - Matrices: Each column of a matrix is treated like a vec4 for alignment purposes. For example, in a mat4, each column is aligned to 16 bytes.
+    - Arrays: Each element is aligned to the base alignment of the type. For example, an array of vec3s will have each vec3 aligned like a vec4.
+    - Due to its alignment rules, std140 can introduce a significant amount of padding to ensure each element meets the alignment requirements.
+  - **`std430`:** Used with shader storage blocks for more efficient memory usage.
+    - Vectors have natural alignment.
+    - Arrays are tightly packed but respect the base alignment of their elements.
+    - Scalars and Vectors: They are aligned to their component size. For example, a vec3 of floats is aligned to 12 bytes (3x4 bytes) rather than 16 bytes. A single float is aligned to 4 bytes.
+    - Matrices: By default, matrices in std430 are treated as arrays of their column vectors, and each column vector is aligned according to the rules for a vector above. However, you can use row_major or column_major qualifiers to change the layout.
+    - Arrays: The alignment of an array is the same as the alignment of its element type, but the stride (the space from one element to the next) is rounded up to the size of a vec4 if the element size is less than the size of a vec4.
+- **`shared` & `packed`:**
+  - **`shared`:** Default layout, compiler determines the best layout. **DEFAULT**
+  - **`packed`:** Tightly packs variables within a block without unnecessary padding. 
+
+- **`row_major` & `column_major`:**
+  - **`row_major`:** Indicates matrices are stored row by row.
+  - **`column_major`:** Indicates matrices are stored column by column (default). **DEFAULT**
+
+- **`binding`:**
+  - Specifies the binding point for a uniform block or shader storage block.
+
+- **`location`:**
+  - Specifies the location index of an input or output variable in the shader.
+
+- **`offset`:**
+  - Specifies the byte offset of a variable within a uniform or shader storage block.
+
+- **`early_fragment_tests`:**
+  - Used in fragment shaders to indicate depth and stencil testing should be performed before execution.
+
+Nutshell:
+* shared: allows glslc to determine the layout, can have cross-platform consequences
+* std140: scalars and vectors aligned to vec4. stable and portable packing, but can waste space in arrays
+* std430: scalars and vectors are aligned to their size (up to the size of vec4), and arrays have elements aligned to the size of the element type but with a stride rounded up to the size of a vec4 
+
+Example: In std140, an array of 3 floats would be aligned like this: [float (16 bytes), float (16 bytes), float (16 bytes)], totaling 48 bytes. In std430, it would be more like [float (4 bytes), float (4 bytes), float (4 bytes)], totaling 12 bytes (or 16 bytes if you consider the stride adjustment for arrays).
+
+
+![](Assets/Screenshots/animated_water_texture.png)
+
+okay, animated texture. I should figure out how to make GIFs out of these.
+
 ## 1/6/24 More textures:
 Despite looking like crappy plastic this is apparently the best I can do with my current lighting model. 
 let's add a snow and beach texture and see if we can't make it look a bit better. plus I can practice binding multiple shaders
@@ -50,6 +108,7 @@ let's add a snow and beach texture and see if we can't make it look a bit better
 * take a few passes at making the rendering looka little better
 
 ![](Assets/Screenshots/blended_textured_lit_terrain.png)
+
 So this still looks like plastic, but it blends three textures: a beach/mountain terrain/snow texture and looks marginally better. this could be used in an early 90s 3D game.
 
 Let's get the water in, done.

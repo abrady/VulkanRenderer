@@ -187,6 +187,7 @@ set(VULKAN_RENDERER_SOURCES
     "Source/Vulk/VulkActor.cpp"
     "Source/Vulk/VulkCamera.cpp"
     "Source/Vulk/VulkDescriptorSetLayoutBuilder.cpp"
+    "Source/Vulk/VulkDescriptorSetUpdater.cpp"
     "Source/Vulk/VulkPipelineBuilder.cpp"
 )
 

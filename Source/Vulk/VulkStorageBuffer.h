@@ -25,20 +25,23 @@
 #include "Vulk.h"
 
 template<typename T>
-struct VulkStorageBuffer {
+class VulkStorageBuffer {
+public:
     VkBuffer buf;               // Vulkan buffer handle
     VkDeviceMemory mem;         // Vulkan device memory handle
     T* mappedObjs;              // Contiguous array of memory mapped objects
+    uint32_t numObjs;           // Number of objects in the buffer
 
     /**
     * Creates a Vulkan storage buffer and maps the memory for the specified number of objects.
     * @param vk The Vulk object used for Vulkan operations.
     * @param numActors The number of objects to be stored in the buffer.
     */
-    void createAndMap(Vulk &vk, uint32_t numActors) {
-        VkDeviceSize bufferSize = sizeof(T) * numActors;
+    void createAndMap(Vulk &vk, uint32_t numElts) {
+        VkDeviceSize bufferSize = sizeof(T) * numElts;
         vk.createBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buf, mem);
         vkMapMemory(vk.device, mem, 0, bufferSize, 0, (void**)&mappedObjs);
+        numObjs = numElts;
     }
 
     /**
@@ -48,5 +51,9 @@ struct VulkStorageBuffer {
     void cleanup(VkDevice dev) {
         vkDestroyBuffer(dev, buf, nullptr);
         vkFreeMemory(dev, mem, nullptr);
+    }
+
+    uint32_t getSize() {
+        return sizeof(T) * numObjs;
     }
 };

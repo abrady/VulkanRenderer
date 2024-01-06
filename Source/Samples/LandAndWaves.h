@@ -6,6 +6,7 @@
 #include "Vulk/VulkCamera.h"
 #include "Vulk/VulkPipelineBuilder.h"
 #include "Vulk/VulkDescriptorPoolBuilder.h"
+#include "Vulk/VulkDescriptorSetUpdater.h"
 
 class LandAndWaves : public Vulk {
     struct UniformBufferObject {

@@ -19,6 +19,10 @@ layout(std430, binding = VulkShaderBinding_Materials) buffer MaterialBuf {
     Material material;
 } materialBuf;
 
+layout(std430, binding = VulkShaderBinding_WavesXform) buffer WavesXformBuf {
+    mat4 wavesXform;
+} wavesXformBuf;
+
 layout(location = 0) out vec4 outColor;
 
 float calcAttenuation(float dist, float falloffStart, float falloffEnd) {
@@ -29,6 +33,9 @@ float calcAttenuation(float dist, float falloffStart, float falloffEnd) {
 }
 
 void main() {
-    vec4 wavesDiffuse = texture(texSampler, fragTexCoord);
+    mat4 uvxform = wavesXformBuf.wavesXform;
+    vec4 texCoord3 = uvxform * vec4(fragTexCoord, 0.0, 1.0);
+    vec2 texCoord = vec2(texCoord3); // no need to divide by w
+    vec4 wavesDiffuse = texture(texSampler, texCoord);
     outColor = basicLighting(lightBuf.light, materialBuf.material, wavesDiffuse, eyePosUBO.eyePos, fragNormal, fragPos);
 }

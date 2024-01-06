@@ -8,6 +8,7 @@
 #include "Vulk/VulkDescriptorPoolBuilder.h"
 #include "Vulk/VulkUniformBuffer.h"
 #include "Vulk/VulkStorageBuffer.h"
+#include "Vulk/VulkDescriptorSetUpdater.h"
 
 class TexturedScene : public Vulk {
     VulkCamera camera;
@@ -151,6 +152,7 @@ class TexturedScene : public Vulk {
         0.5f
     };
     VulkStorageBuffer<Material> wavesSSBO;
+    VulkStorageBuffer<glm::mat4> wavesXformSSBO;
 
     struct Light {
         glm::vec3 pos;          // point light only
@@ -221,6 +223,9 @@ public:
         terrainSSBO.mappedObjs[0] = terrainMaterial;
         wavesSSBO.createAndMap(*this, 1);
         wavesSSBO.mappedObjs[0] = wavesMaterial;
+
+        wavesXformSSBO.createAndMap(*this, 1);
+        wavesXformSSBO.mappedObjs[0] = glm::mat4(1.0f);
 
         // create the lights SSBO
         lightSSBO.createAndMap(*this, 1);
@@ -314,9 +319,9 @@ public:
                     .addImageSampler(beachTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler)
                     .addImageSampler(grassTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler2)
                     .addImageSampler(snowTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler3)
-                    .addStorageBuffer(meshRenderInfo.ssbos[i].buf, sizeof(ActorSSBOElt) * numActors, VulkShaderBinding_Actors)
-                    .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
-                    .addStorageBuffer(terrainSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
+                    .addVulkStorageBuffer(meshRenderInfo.ssbos[i], VulkShaderBinding_Actors)
+                    .addVulkStorageBuffer(lightSSBO, VulkShaderBinding_Lights)
+                    .addVulkStorageBuffer(terrainSSBO, VulkShaderBinding_Materials)
                     .update(device);
             }
 
@@ -349,6 +354,7 @@ public:
             .addSampler(VulkShaderBinding_TextureSampler)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .addStorageBuffer(VulkShaderBinding_WavesXform, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(*this);
 
         VulkPipelineBuilder(*this)
@@ -365,7 +371,7 @@ public:
         wavesDescriptorPool = VulkDescriptorPoolBuilder()
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 2)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
-            .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * 3)
+            .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * 4)
             .build(device, MAX_FRAMES_IN_FLIGHT);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -374,8 +380,9 @@ public:
                 .addUniformBuffer(xformsUBOs[i].buf, xformsUBOs[i].getSize(), VulkShaderBinding_XformsUBO)
                 .addUniformBuffer(eyePosUBOs[i].buf, eyePosUBOs[i].getSize(), VulkShaderBinding_EyePos)
                 .addImageSampler(wavesTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler)
-                .addStorageBuffer(lightSSBO.buf, sizeof(Light), VulkShaderBinding_Lights)
-                .addStorageBuffer(wavesSSBO.buf, sizeof(Material), VulkShaderBinding_Materials)
+                .addVulkStorageBuffer(lightSSBO, VulkShaderBinding_Lights)
+                .addVulkStorageBuffer(wavesSSBO, VulkShaderBinding_Materials)
+                .addVulkStorageBuffer(wavesXformSSBO, VulkShaderBinding_WavesXform)
                 .update(device);
         }
     }
@@ -415,6 +422,7 @@ private:
     std::chrono::steady_clock::time_point updateWavesStartTime = std::chrono::high_resolution_clock::now();
     void wavesTick() {
         auto currentTime = std::chrono::high_resolution_clock::now();
+        // delta time in seconds
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - updateWavesStartTime).count();
 
         for (auto &v : wavesMesh.vertices) {
@@ -428,6 +436,21 @@ private:
 
         // update the buffer
         wavesRender[(currentFrame + 1) % MAX_FRAMES_IN_FLIGHT].copyToBuffer(*this, wavesMesh.vertices, wavesMesh.indices);
+
+        // update the waves texture position
+        glm::mat4 &texMat = wavesXformSSBO.mappedObjs[0];
+        float tu = texMat[3][0];
+        float tv = texMat[3][1];
+        tu += 0.0001f * time;
+        tv += 0.00002f * time;
+        if (tu > 1.0f) {
+            tu = fmod(tu, 1.0f);
+        }
+        if (tv > 1.0f) {
+            tv = fmod(tv, 1.0f);
+        }
+        texMat[3][0] = tu;
+        texMat[3][1] = tv;
     }
 
     void drawFrame(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer) override {
@@ -542,6 +565,7 @@ private:
         actorsRenderBuffers.cleanup(*this);
         terrainSSBO.cleanup(device);
         wavesSSBO.cleanup(device);
+        wavesXformSSBO.cleanup(device);
         lightSSBO.cleanup(device);
 
         vkDestroyDescriptorSetLayout(device, wavesDescriptorSetLayout, nullptr);
