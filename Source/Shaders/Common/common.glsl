@@ -10,6 +10,12 @@ const int VulkShaderBinding_TextureSampler2 = 6;
 const int VulkShaderBinding_TextureSampler3 = 7;
 const int VulkShaderBinding_WavesXform = 8;
 
+struct GlobalXform {
+    mat4 world;
+    mat4 view;
+    mat4 proj;
+};
+
 // note that the order matters here: it allows this to be packed into 3 vec4s
 struct Light {
     vec3 pos;           // point light only

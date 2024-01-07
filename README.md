@@ -46,6 +46,22 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 # Log
 
 
+## 1/6/24 Clipping a chain link fence and tiles
+Let's try to do a clipping shader that culls pixels if they are below a certain alpha, this is useful because it lets you not have to worry about render order for blending alpha components
+
+![](Assets/Screenshots/chain_link_before.png)
+
+Here's the chain-link fence rendered on top of the mesh.
+
+![](Assets/Screenshots/clipped_fence.png)
+
+and this shows the clipped version. it uses two textures:
+* one for the opacity
+* one for the color
+
+I'm not super happy with how we're checking for opacity but this is fine for now. ideally I'd make a buffer with a single alpha value or something.
+
+
 
 ## 1/6/24 Blending
 Blending is a process that combines the color of a new pixel (source) with the color of the pixel already in the framebuffer (destination) to produce a final color. This technique is commonly used for effects like transparency, antialiasing, and light accumulation.
