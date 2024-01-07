@@ -236,13 +236,13 @@ public:
             .build();
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/litTexturedTerrain.spv")
+            .addVertexShaderStage("Source/Shaders/Vert/litTexturedTerrain.spv")
             .addVertexInputBindingDescription(0, sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/litTexturedTerrain.spv")
+            .addFragmentShaderStage("Source/Shaders/Frag/litTexturedTerrain.spv")
             .build(actorsDescriptorSetLayout, &actorsPipelineLayout, &actorsGraphicsPipeline);
 
         // test normal rendering: do something a little simpler
@@ -276,15 +276,15 @@ public:
             .build();
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/normals.spv") 
+            .addVertexShaderStage("Source/Shaders/Vert/normals.spv") 
             .setPrimitiveTopology(VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
-            .addGeometryShaderStage("Assets/Shaders/Geom/normals.spv") 
+            .addGeometryShaderStage("Source/Shaders/Geom/normals.spv") 
             .addVertexInputBindingDescription(0, sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/normals.spv")
+            .addFragmentShaderStage("Source/Shaders/Frag/normals.spv")
             // .setLineWidth(10.f)
             .setCullMode(VK_CULL_MODE_NONE)
             // .setDepthTestEnabled(false)
@@ -351,13 +351,13 @@ public:
             .build();
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Assets/Shaders/Vert/litTexturedWaves.spv")
+            .addVertexShaderStage("Source/Shaders/Vert/litTexturedWaves.spv")
             .addVertexInputBindingDescription(0,sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Assets/Shaders/Frag/litTexturedWaves.spv")
+            .addFragmentShaderStage("Source/Shaders/Frag/litTexturedWaves.spv")
             .setBlendingEnabled(true)
             .build(wavesDescriptorSetLayout, &wavesPipelineLayout, &wavesGraphicsPipeline);
 

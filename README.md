@@ -45,11 +45,29 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 1/7/24 Stenciling
+
+sez chatgpt: Stencil buffers are a powerful tool in computer graphics used in various rendering techniques to control the drawing of pixels on the screen. They work alongside the color and depth buffers and are particularly useful when you need to restrict rendering to specific parts of the screen. Here's how they work and what they're typically used for:
+
+### 1. What is a Stencil Buffer?
+A stencil buffer is an array of per-pixel information, typically 8 bits per pixel, that stores an integer (stencil value) for every pixel on the screen. It's used in conjunction with the depth and color buffers to add another level of control over which pixels should be updated.
+
+### 2. How Stencil Buffers Work:
+Initialization: First, the stencil buffer is cleared to a known value, often 0, at the start of the frame.
+Stencil Test: When rendering, the stencil value for each pixel is tested against a specified reference value using a specified stencil function (e.g., less than, equal to). The outcome of this test determines whether the pixel will be drawn.
+Stencil Operations: Depending on whether the stencil test (and the depth test) passes or fails, different operations can be performed on the stencil buffer's value, such as keeping the current value, replacing it with a new one, incrementing or decrementing it, etc.
+
+### 3. Uses of Stencil Buffers:
+Clipping Regions: By rendering shapes into the stencil buffer, you can define regions of the screen where rendering is allowed or disallowed, effectively clipping any subsequent draws to these regions.
+Shadows: In shadow volume techniques, stencil buffers can help determine which areas of the screen are in shadow by incrementing and decrementing stencil values as the shadow volumes are rendered.
+Outline Effects: Stencil buffers can be used to create outline effects around objects. By rendering an object into the stencil buffer and then rendering a slightly larger version behind it with only the pixels not matching the stencil value, you create an outline.
+Mirror Reflections: For rendering reflections on a mirror-like surface, you can use the stencil buffer to mask out the area of the reflection.
+Multi-Pass Rendering: In complex rendering techniques where multiple passes are needed, the stencil buffer can help keep track of different stages or areas that need specific rendering effects.
+
+
 
 ## 1/6/24 Clipping a chain link fence and tiles
 Let's try to do a clipping shader that culls pixels if they are below a certain alpha, this is useful because it lets you not have to worry about render order for blending alpha components
-
-![](Assets/Screenshots/chain_link_before.png)
 
 Here's the chain-link fence rendered on top of the mesh.
 

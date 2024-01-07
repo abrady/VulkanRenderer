@@ -116,7 +116,7 @@ file(GLOB SHADER_COMMON_FILES "${CMAKE_SOURCE_DIR}/Source/Shaders/Common/*")
 
 # Set the source and destination directories
 set(SHADER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/Source/Shaders")
-set(SHADER_DEST_DIR "${TARGET_DIR}/Assets/Shaders") 
+set(SHADER_DEST_DIR "${TARGET_DIR}/Source/Shaders") 
 
 # Create the destination directory if it doesn't exist
 file(MAKE_DIRECTORY ${SHADER_DEST_DIR})

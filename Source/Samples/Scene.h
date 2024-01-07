@@ -268,8 +268,8 @@ private:
     }
 
     void createGraphicsPipeline() {
-        char const *vert_shader_path = "Assets/Shaders/Vert/instance.spv";
-        char const *frag_shader_path = "Assets/Shaders/Frag/instance.spv";
+        char const *vert_shader_path = "Source/Shaders/Vert/instance.spv";
+        char const *frag_shader_path = "Source/Shaders/Frag/instance.spv";
 
         auto vertShaderCode = readFileIntoMem(vert_shader_path);
         auto fragShaderCode = readFileIntoMem(frag_shader_path);
