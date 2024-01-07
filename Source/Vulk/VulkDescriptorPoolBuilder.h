@@ -4,6 +4,7 @@
 
 class VulkDescriptorPoolBuilder {
 private:
+    Vulk &vk;
     std::vector<VkDescriptorPoolSize> poolSizes;
 
     VulkDescriptorPoolBuilder& addPoolSizeCount(VkDescriptorType type, uint32_t count) {
@@ -14,6 +15,7 @@ private:
         return *this;
     }
 public:
+    VulkDescriptorPoolBuilder(Vulk &vk) : vk(vk) {}
     VulkDescriptorPoolBuilder& addUniformBufferCount(uint32_t count) {
         return addPoolSizeCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count);
     }
@@ -30,7 +32,7 @@ public:
         return addPoolSizeCount(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, count);
     }
 
-    VkDescriptorPool build(VkDevice device, uint32_t maxSets) {
+    VkDescriptorPool build(uint32_t maxSets) {
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
@@ -38,7 +40,7 @@ public:
         poolInfo.maxSets = maxSets;
 
         VkDescriptorPool descriptorPool;
-        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+        if (vkCreateDescriptorPool(vk.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor pool!");
         }
 

@@ -160,11 +160,11 @@ public:
             ubo.createUniformBuffers(*this);
         }
 
-        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder(*this)
             .addUniformBuffer(0, VK_SHADER_STAGE_VERTEX_BIT)
             .addSampler(1)
             .addStorageBuffer(2, VK_SHADER_STAGE_VERTEX_BIT)
-            .build(*this);
+            .build();
 
         VulkPipelineBuilder(*this)
             .addVertexShaderStage("Assets/Shaders/Vert/terrain.spv")
@@ -184,11 +184,11 @@ public:
 
         actorsRender.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
         uint32_t numMeshes = static_cast<uint32_t>(meshActors.size());
-        actorsDescriptorPool = VulkDescriptorPoolBuilder()
+        actorsDescriptorPool = VulkDescriptorPoolBuilder(*this)
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
             .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
-            .build(device, MAX_FRAMES_IN_FLIGHT * numMeshes);
+            .build(MAX_FRAMES_IN_FLIGHT * numMeshes);
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
@@ -216,10 +216,10 @@ public:
             render.init(*this, wavesMesh.vertices, wavesMesh.indices);
         }
 
-        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder(*this)
             .addUniformBuffer(0, VK_SHADER_STAGE_VERTEX_BIT)
             .addSampler(1)
-            .build(*this);
+            .build();
 
         VulkPipelineBuilder(*this)
             .addVertexShaderStage("Assets/Shaders/Vert/waves.spv")
@@ -231,10 +231,10 @@ public:
             .addFragmentShaderStage("Assets/Shaders/Frag/waves.spv")
             .build(wavesDescriptorSetLayout, &wavesPipelineLayout, &wavesGraphicsPipeline);
 
-        wavesDescriptorPool = VulkDescriptorPoolBuilder()
+        wavesDescriptorPool = VulkDescriptorPoolBuilder(*this)
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
-            .build(device, MAX_FRAMES_IN_FLIGHT);
+            .build(MAX_FRAMES_IN_FLIGHT);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             wavesDescriptorSets[i] = createDescriptorSet(wavesDescriptorSetLayout, wavesDescriptorPool);
@@ -361,7 +361,6 @@ private:
     void cleanup() override {
         vkDestroyPipeline(device, actorsGraphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, actorsPipelineLayout, nullptr);
-        vkDestroyRenderPass(device, renderPass, nullptr);
 
         for (auto ubo: ubos) {
             vkDestroyBuffer(device, ubo.buf, nullptr);

@@ -13,7 +13,10 @@ Some quick thoughts on my approach: one thing you might notice is that I avoid w
 2. [Shape Geometry](/Source/Samples/ShapeGeometry.h)
 3. [Scene](/Source/Samples/Scene.h) - a scene with a floor and some cylinders and spheres, uses instancing
 4. [Land and Waves](/Source/Samples/LandAndWaves.h) - a procedurally generated terrain example
-5. [Lights](/Source/Samples/Lighting.h)
+5. [Lights](/Source/Samples/Lighting.h) - basic lighting
+6. [LitLandAndWaves](/Source/Samples/LitLandAndWaves.h) - lighting applied to the land and waves scene
+7. [TexturedScene](/Source/Samples/TexturedScene.h) - blended textures applied to the land and waves scene, with lighting.
+8. [Blending](/Source/Samples/Blending.h)
 
 # Resources
 * [Vulkan Tutorial](https://vulkan-tutorial.com/Introduction)
@@ -41,6 +44,43 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
     * x update the descriptor set
 
 # Log
+
+
+
+## 1/6/24 Blending
+Blending is a process that combines the color of a new pixel (source) with the color of the pixel already in the framebuffer (destination) to produce a final color. This technique is commonly used for effects like transparency, antialiasing, and light accumulation.
+
+In Vulkan, blending is configured per framebuffer attachment via the VkPipelineColorBlendAttachmentState structure. Here's a brief overview of the key components:
+* Enable/Disable Blending: You can enable or disable blending for each attachment. If disabled, the new pixel (source) color overwrites the existing pixel (destination) color.
+* Blend Factors: These factors determine how the source and destination colors are weighted. Vulkan provides various options like VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, and more. You can set different factors for color and alpha components.
+* Blend Operations: This specifies how the weighted source and destination colors are combined. Common operations include add (VK_BLEND_OP_ADD), subtract, and reverse subtract.
+* Color Write Mask: This controls which color components (R, G, B, A) are actually passed to the framebuffer. For example, you might write only the alpha component to create a mask.
+* Pipeline Configuration: Blending is set up when you create the graphics pipeline. You’ll specify the blend state for each of the framebuffers you're rendering to.
+
+tl;dr - final color is typically calculated using an equation like: FinalColor = (SrcColor * SrcFactor) op (DstColor * DstFactor) where op is the blend operation, and the factors are what you’ve set in the blend state.
+
+I already did this for the water, but I can't say the transparency looked that great, let me see if playing around with these settings make it look better.
+
+![](Assets/Screenshots/water_blend0.png)
+
+
+Here's the starting blending. it has the following settings:
+
+        srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        colorBlendOp = VK_BLEND_OP_ADD;
+        srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        alphaBlendOp = VK_BLEND_OP_ADD;
+
+I just copied this from chatpgpt, but here's my interpretation of this:
+1. the final color (excluding alpha) is (SrcColor * SrcAlpha) + (DstColor * (1 - SrcAlpha)) : this is basically a linear blend and conserves the energy in the system.
+2. the final alpha is (SrcAlpha * 1) + (DstAlpha * 0) = SrcAlpha : so the source material's alpha becomes the final alpha
+
+The final alpha is important because it could affect future transparent blends depending on the blend operation.
+
+
+
 
 ## 1/6/24 uv transforms: make the water move
 
@@ -98,7 +138,7 @@ Example: In std140, an array of 3 floats would be aligned like this: [float (16 
 
 ![](Assets/Screenshots/animated_water_texture.png)
 
-okay, animated texture. I should figure out how to make GIFs out of these.
+okay, animated texture. just passing in a mat4 for simplicity. I should figure out how to make GIFs out of these.
 
 ## 1/6/24 More textures:
 Despite looking like crappy plastic this is apparently the best I can do with my current lighting model. 

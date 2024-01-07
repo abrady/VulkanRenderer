@@ -94,7 +94,7 @@ foreach(TEXTURES_FILE ${TEXTURES})
         OUTPUT "${DEST}"
         COMMAND ${CMAKE_COMMAND} -E copy "${TEXTURES_FILE}" "${DEST}"
         DEPENDS "${TEXTURES_FILE}"
-        COMMENT "build textures"
+        COMMENT "build texture ${TEXTURES_FILE}"
     )
     # Add the output file to a list
     list(APPEND COMPILED_TEXTURES "${DEST}")
@@ -189,6 +189,7 @@ set(VULKAN_RENDERER_SOURCES
     "Source/Vulk/VulkDescriptorSetLayoutBuilder.cpp"
     "Source/Vulk/VulkDescriptorSetUpdater.cpp"
     "Source/Vulk/VulkPipelineBuilder.cpp"
+    "Source/Vulk/VulkTextureView.cpp"
 )
 
 

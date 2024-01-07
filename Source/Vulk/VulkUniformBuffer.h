@@ -9,7 +9,7 @@
  * material properties.
  * 
  * This template class allows you to create and manage uniform buffers of a specific
- * type T. The createUniformBuffers method is used to create the Vulkan buffer and
+ * type T. The init method is used to create the Vulkan buffer and
  * allocate memory for the uniform buffer object. The mappedUBO member variable
  * provides a pointer to the mapped memory of the uniform buffer, allowing you to
  * update its contents.
@@ -21,7 +21,7 @@
  * Example usage:
  * 
  * VulkUniformBuffer<UniformBufferObject> ubo;
- * ubo.createUniformBuffers(vk);
+ * ubo.init(vk);
  * 
  * // Update the contents of the uniform buffer
  * ubo.mappedUBO->model = glm::mat4(1.0f);
@@ -45,7 +45,7 @@ public:
     VkBuffer buf;
     T* mappedUBO;
 
-    void createUniformBuffers(Vulk &vk) {
+    void init(Vulk &vk) {
         VkDeviceSize bufferSize = sizeof(T);
         vk.createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buf, mem);
         vkMapMemory(vk.device, mem, 0, bufferSize, 0, (void**)&mappedUBO);

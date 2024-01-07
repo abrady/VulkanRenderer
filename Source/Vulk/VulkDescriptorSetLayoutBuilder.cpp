@@ -35,7 +35,7 @@ VulkDescriptorSetLayoutBuilder& VulkDescriptorSetLayoutBuilder::addStorageBuffer
     return *this;
 }
 
-VkDescriptorSetLayout VulkDescriptorSetLayoutBuilder::build(Vulk &vk)
+VkDescriptorSetLayout VulkDescriptorSetLayoutBuilder::build()
 {
     VkDescriptorSetLayoutCreateInfo layoutCreateInfo{};
     layoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;

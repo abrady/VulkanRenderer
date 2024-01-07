@@ -134,6 +134,8 @@ void Vulk::cleanupVulkan()
 
     cleanup();
 
+    vkDestroyRenderPass(device, renderPass, nullptr);
+
     vkDestroyDevice(device, nullptr);
 
     if (enableValidationLayers)
@@ -209,6 +211,19 @@ VkShaderModule Vulk::createShaderModule(const std::vector<char> &code)
     VK_CALL(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule));
 
     return shaderModule;
+}
+
+VkDescriptorSet Vulk::createDescriptorSet(VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool) {
+    VkDescriptorSetLayout layouts[] = { descriptorSetLayout };
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = layouts;
+
+    VkDescriptorSet descriptorSet;
+    VK_CALL(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+    return descriptorSet;
 }
 
 VkSampler Vulk::createTextureSampler()

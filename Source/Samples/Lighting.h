@@ -139,10 +139,10 @@ public:
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
         textureSampler = createTextureSampler();
         for (auto &ubo: xformsUBOs) {
-            ubo.createUniformBuffers(*this);
+            ubo.init(*this);
         }
         for (auto &ubo: eyePosUBOs) {
-            ubo.createUniformBuffers(*this);
+            ubo.init(*this);
         }
 
         // create the materials SSBO
@@ -153,14 +153,14 @@ public:
         lightSSBO.createAndMap(*this, 1);
         lightSSBO.mappedObjs[0] = light;
 
-        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder(*this)
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addSampler(VulkShaderBinding_TextureSampler)
             .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_VERTEX_BIT)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .build(*this);
+            .build();
 
         VulkPipelineBuilder(*this)
             .addVertexShaderStage("Assets/Shaders/Vert/light.spv")
@@ -182,11 +182,11 @@ public:
 
         actorsRenderBuffers.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
         uint32_t numMeshes = static_cast<uint32_t>(meshActors.size());
-        actorsDescriptorPool = VulkDescriptorPoolBuilder()
+        actorsDescriptorPool = VulkDescriptorPoolBuilder(*this)
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes * 2)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * numMeshes)
             .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * numMeshes * 3)
-            .build(device, MAX_FRAMES_IN_FLIGHT * numMeshes);
+            .build(MAX_FRAMES_IN_FLIGHT * numMeshes);
 
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
@@ -302,7 +302,6 @@ private:
     void cleanup() override {
         vkDestroyPipeline(device, actorsGraphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, actorsPipelineLayout, nullptr);
-        vkDestroyRenderPass(device, renderPass, nullptr);
 
         for (auto ubo: xformsUBOs) {
             ubo.cleanup(*this);

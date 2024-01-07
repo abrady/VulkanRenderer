@@ -51,6 +51,8 @@ public:
     VulkPipelineBuilder& addVertexInputFieldVec3(uint32_t binding, uint32_t location, uint32_t fieldOffset);
     VulkPipelineBuilder& addVertexInputFieldVec2(uint32_t binding, uint32_t location, uint32_t fieldOffset);
 
+    VulkPipelineBuilder& addVulkVertexInput(uint32_t binding);
+
     VulkPipelineBuilder& setBlendingEnabled(bool enabled, VkColorComponentFlags colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT);
 
     void build(VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout *pipelineLayout, VkPipeline *graphicsPipeline);

@@ -132,7 +132,7 @@ class TexturedScene : public Vulk {
     TextureView beachTextureView, grassTextureView, snowTextureView, wavesTextureView;
     VkSampler textureSampler;
 
-    bool rotateWorld = true;
+    bool rotateWorld = false;
 
     struct Material {
         glm::vec4 diffuse;
@@ -202,7 +202,7 @@ class TexturedScene : public Vulk {
     VkPipeline normalsPipeline;
 public:
     void init() override {
-        camera.lookAt(glm::vec3(15.f, 120.f, 170.f), glm::vec3(0.f, 0.f, 0.f));
+        camera.lookAt(glm::vec3(3.5f, 34.f, 75.f), glm::vec3(0.f, -20.f, -30.f));
 
         beachTextureView.init(*this, "Assets/Textures/aerial_beach_01/aerial_beach_01_diff_4k.jpg");
         grassTextureView.init(*this, "Assets/Textures/aerial_rocks_02/aerial_rocks_02_diff_4k.jpg");
@@ -210,13 +210,6 @@ public:
         textureSampler = createTextureSampler();
 
         wavesTextureView.init(*this, "Assets/Textures/sea_water_2048x2048.png");
-
-        for (auto &ubo: xformsUBOs) {
-            ubo.createUniformBuffers(*this);
-        }
-        for (auto &ubo: eyePosUBOs) {
-            ubo.createUniformBuffers(*this);
-        }
 
         // create the materials SSBO
         terrainSSBO.createAndMap(*this, 1);
@@ -231,7 +224,7 @@ public:
         lightSSBO.createAndMap(*this, 1);
         lightSSBO.mappedObjs[0] = light;
 
-        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder(*this)
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addSampler(VulkShaderBinding_TextureSampler)
@@ -240,7 +233,7 @@ public:
             .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_VERTEX_BIT)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .build(*this);
+            .build();
 
         VulkPipelineBuilder(*this)
             .addVertexShaderStage("Assets/Shaders/Vert/litTexturedTerrain.spv")
@@ -277,10 +270,10 @@ public:
         actorsRenderBuffers.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
 
         // for debugging
-        normalsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        normalsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder(*this)
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_GEOMETRY_BIT)
             .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_GEOMETRY_BIT)
-            .build(*this);
+            .build();
 
         VulkPipelineBuilder(*this)
             .addVertexShaderStage("Assets/Shaders/Vert/normals.spv") 
@@ -301,11 +294,11 @@ public:
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
             uint32_t numActors = static_cast<uint32_t>(meshRenderInfo.actors.size());
-            meshRenderInfo.descriptorPool = VulkDescriptorPoolBuilder()
+            meshRenderInfo.descriptorPool = VulkDescriptorPoolBuilder(*this)
                 .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 2)
                 .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * 3)
                 .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * 3)
-                .build(device, MAX_FRAMES_IN_FLIGHT);
+                .build(MAX_FRAMES_IN_FLIGHT);
 
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
                 // map the actor xforms into a mem-mapped SSBO
@@ -326,10 +319,10 @@ public:
             }
 
             // for debugging
-            meshRenderInfo.normalsDescriptorPool = VulkDescriptorPoolBuilder()
+            meshRenderInfo.normalsDescriptorPool = VulkDescriptorPoolBuilder(*this)
                 .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
                 .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT)
-                .build(device, MAX_FRAMES_IN_FLIGHT);
+                .build(MAX_FRAMES_IN_FLIGHT);
 
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
                 meshRenderInfo.normalsDescriptorSets[i] = createDescriptorSet(normalsDescriptorSetLayout, meshRenderInfo.normalsDescriptorPool);
@@ -348,14 +341,14 @@ public:
             render.init(*this, wavesMesh.vertices, wavesMesh.indices);
         }
 
-        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder(*this)
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addSampler(VulkShaderBinding_TextureSampler)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_WavesXform, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .build(*this);
+            .build();
 
         VulkPipelineBuilder(*this)
             .addVertexShaderStage("Assets/Shaders/Vert/litTexturedWaves.spv")
@@ -368,11 +361,11 @@ public:
             .setBlendingEnabled(true)
             .build(wavesDescriptorSetLayout, &wavesPipelineLayout, &wavesGraphicsPipeline);
 
-        wavesDescriptorPool = VulkDescriptorPoolBuilder()
+        wavesDescriptorPool = VulkDescriptorPoolBuilder(*this)
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 2)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
             .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * 4)
-            .build(device, MAX_FRAMES_IN_FLIGHT);
+            .build(MAX_FRAMES_IN_FLIGHT);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             wavesDescriptorSets[i] = createDescriptorSet(wavesDescriptorSetLayout, wavesDescriptorPool);
@@ -420,6 +413,7 @@ private:
     }
 
     std::chrono::steady_clock::time_point updateWavesStartTime = std::chrono::high_resolution_clock::now();
+    std::chrono::steady_clock::time_point updateWavesLastTime = std::chrono::high_resolution_clock::now();
     void wavesTick() {
         auto currentTime = std::chrono::high_resolution_clock::now();
         // delta time in seconds
@@ -435,14 +429,15 @@ private:
         }
 
         // update the buffer
-        wavesRender[(currentFrame + 1) % MAX_FRAMES_IN_FLIGHT].copyToBuffer(*this, wavesMesh.vertices, wavesMesh.indices);
+        // wavesRender[(currentFrame + 1) % MAX_FRAMES_IN_FLIGHT].copyToBuffer(*this, wavesMesh.vertices, wavesMesh.indices);
 
         // update the waves texture position
+        float dt = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - updateWavesLastTime).count();
         glm::mat4 &texMat = wavesXformSSBO.mappedObjs[0];
         float tu = texMat[3][0];
         float tv = texMat[3][1];
-        tu += 0.0001f * time;
-        tv += 0.00002f * time;
+        tu += 0.01f * dt;
+        tv += 0.002f * dt;
         if (tu > 1.0f) {
             tu = fmod(tu, 1.0f);
         }
@@ -451,6 +446,7 @@ private:
         }
         texMat[3][0] = tu;
         texMat[3][1] = tv;
+        updateWavesLastTime = currentTime;
     }
 
     void drawFrame(VkCommandBuffer commandBuffer, VkFramebuffer frameBuffer) override {
@@ -542,7 +538,6 @@ private:
     void cleanup() override {
         vkDestroyPipeline(device, actorsGraphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, actorsPipelineLayout, nullptr);
-        vkDestroyRenderPass(device, renderPass, nullptr);
 
         for (auto ubo: xformsUBOs) {
             ubo.cleanup(*this);

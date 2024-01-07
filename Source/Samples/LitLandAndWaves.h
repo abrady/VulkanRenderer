@@ -182,10 +182,10 @@ public:
         textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
         textureSampler = createTextureSampler();
         for (auto &ubo: xformsUBOs) {
-            ubo.createUniformBuffers(*this);
+            ubo.init(*this);
         }
         for (auto &ubo: eyePosUBOs) {
-            ubo.createUniformBuffers(*this);
+            ubo.init(*this);
         }
 
         // create the materials SSBO
@@ -196,14 +196,14 @@ public:
         lightSSBO.createAndMap(*this, 1);
         lightSSBO.mappedObjs[0] = light;
 
-        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        actorsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder(*this)
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addSampler(VulkShaderBinding_TextureSampler)
             .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_VERTEX_BIT)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .build(*this);
+            .build();
 
         VulkPipelineBuilder(*this)
             .addVertexShaderStage("Assets/Shaders/Vert/litTerrain.spv")
@@ -240,10 +240,10 @@ public:
         actorsRenderBuffers.init(*this, meshAccumulator.vertices, meshAccumulator.indices);
 
         // for debugging
-        normalsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        normalsDescriptorSetLayout = VulkDescriptorSetLayoutBuilder(*this)
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_GEOMETRY_BIT)
             .addStorageBuffer(VulkShaderBinding_Actors, VK_SHADER_STAGE_GEOMETRY_BIT)
-            .build(*this);
+            .build();
 
         VulkPipelineBuilder(*this)
             .addVertexShaderStage("Assets/Shaders/Vert/normals.spv") 
@@ -264,11 +264,11 @@ public:
         for (auto &meshActor : meshActors) {
             auto &meshRenderInfo = meshActor.second;
             uint32_t numActors = static_cast<uint32_t>(meshRenderInfo.actors.size());
-            meshRenderInfo.descriptorPool = VulkDescriptorPoolBuilder()
+            meshRenderInfo.descriptorPool = VulkDescriptorPoolBuilder(*this)
                 .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 2)
                 .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
                 .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * 3)
-                .build(device, MAX_FRAMES_IN_FLIGHT);
+                .build(MAX_FRAMES_IN_FLIGHT);
 
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
                 // map the actor xforms into a mem-mapped SSBO
@@ -287,10 +287,10 @@ public:
             }
 
             // for debugging
-            meshRenderInfo.normalsDescriptorPool = VulkDescriptorPoolBuilder()
+            meshRenderInfo.normalsDescriptorPool = VulkDescriptorPoolBuilder(*this)
                 .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT)
                 .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT)
-                .build(device, MAX_FRAMES_IN_FLIGHT);
+                .build(MAX_FRAMES_IN_FLIGHT);
 
             for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
                 meshRenderInfo.normalsDescriptorSets[i] = createDescriptorSet(normalsDescriptorSetLayout, meshRenderInfo.normalsDescriptorPool);
@@ -309,13 +309,13 @@ public:
             render.init(*this, wavesMesh.vertices, wavesMesh.indices);
         }
 
-        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder()
+        wavesDescriptorSetLayout = VulkDescriptorSetLayoutBuilder(*this)
             .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
             .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addSampler(VulkShaderBinding_TextureSampler)
             .addStorageBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
             .addStorageBuffer(VulkShaderBinding_Materials, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .build(*this);
+            .build();
 
         VulkPipelineBuilder(*this)
             .addVertexShaderStage("Assets/Shaders/Vert/litwaves.spv")
@@ -327,11 +327,11 @@ public:
             .addFragmentShaderStage("Assets/Shaders/Frag/litwaves.spv")
             .build(wavesDescriptorSetLayout, &wavesPipelineLayout, &wavesGraphicsPipeline);
 
-        wavesDescriptorPool = VulkDescriptorPoolBuilder()
+        wavesDescriptorPool = VulkDescriptorPoolBuilder(*this)
             .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 2)
             .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT)
             .addStorageBufferCount(MAX_FRAMES_IN_FLIGHT * 3)
-            .build(device, MAX_FRAMES_IN_FLIGHT);
+            .build(MAX_FRAMES_IN_FLIGHT);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             wavesDescriptorSets[i] = createDescriptorSet(wavesDescriptorSetLayout, wavesDescriptorPool);

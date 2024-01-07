@@ -559,7 +559,6 @@ private:
     void cleanup() override {
         vkDestroyPipeline(device, graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        vkDestroyRenderPass(device, renderPass, nullptr);
 
         for (auto ubo: ubos) {
             vkDestroyBuffer(device, ubo.buf, nullptr);
