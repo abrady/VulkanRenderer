@@ -18,3 +18,9 @@ void VulkMesh::xform(glm::mat4 const &xform) {
         v.tangent = glm::vec3(xform * glm::vec4(v.tangent, 0.0f));
     }
 }
+
+VulkMesh VulkMesh::loadFromFile(char const *filename) {
+    VulkMesh model;
+    loadModel(filename, model.vertices, model.indices);
+    return model;
+}

@@ -16,5 +16,8 @@ public:
     std::vector<uint32_t> indices;
 
     VulkMeshRef appendMesh(VulkMesh const &mesh);
+    VulkMeshRef getMeshRef() const { return {name, 0, 0, (uint32_t)indices.size()}; };
     void xform(glm::mat4 const &xform);
+
+    static VulkMesh loadFromFile(char const *filename);
 };

@@ -45,9 +45,30 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
-## 1/7/24 Stenciling
+## 1/8/24 skull load with normal texture
+I downloaded a model from [Turbo Squid](https://www.turbosquid.com/3d-models/nextgen-skull-3d-model/552621)
 
-sez chatgpt: Stencil buffers are a powerful tool in computer graphics used in various rendering techniques to control the drawing of pixels on the screen. They work alongside the color and depth buffers and are particularly useful when you need to restrict rendering to specific parts of the screen. Here's how they work and what they're typically used for:
+![](Assets/Screenshots/skull_normals.png)
+
+The interesting thing I did here was to use the normal maps texture for the lighting:
+
+    vec4 tex = texture(texSampler, fragTexCoord);
+    vec3 norm = vec3(texture(normSampler, fragTexCoord));
+
+![](Assets/Screenshots/skull_no_normals.png)
+
+here's what it looked like before, for comparison
+
+## 1/7/24 Stenciling: let's make a mirror
+
+sez chatgpt: 
+
+    Stencil buffers are a powerful tool in computer graphics used in various rendering techniques to control the drawing of pixels on the screen. They work alongside the color and depth buffers and are particularly useful when you need to restrict rendering to specific parts of the screen. Here's how they work and what they're typically used for...
+
+Let's make a mirror:
+* load a skull model
+* make a mirror
+
 
 ### 1. What is a Stencil Buffer?
 A stencil buffer is an array of per-pixel information, typically 8 bits per pixel, that stores an integer (stencil value) for every pixel on the screen. It's used in conjunction with the depth and color buffers to add another level of control over which pixels should be updated.

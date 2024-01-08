@@ -57,7 +57,7 @@ foreach(MODEL_FILE ${MODELS})
         OUTPUT "${DEST}"
         COMMAND ${CMAKE_COMMAND} -E copy "${MODEL_FILE}" "${DEST}"
         DEPENDS "${MODEL_FILE}"
-        COMMENT "build models"
+        COMMENT "build models ${MODEL_FILE} to ${DEST}"
     )
     # Add the output file to a list
     list(APPEND COMPILED_MODELS "${DEST}")

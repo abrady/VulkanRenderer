@@ -59,7 +59,18 @@ enum VulkShaderBindings {
     VulkShaderBinding_TextureSampler2 = 6,
     VulkShaderBinding_TextureSampler3 = 7,
     VulkShaderBinding_WavesXform = 8,
+    VulkShaderBinding_NormalSampler = 9,
     VulkShaderBinding_MaxBindingID,
+};
+
+// keep in sync with Source\Shaders\Common\common.glsl
+struct VulkLight {
+    glm::vec3 pos;           // point light only
+    float falloffStart; // point/spot light only
+    glm::vec3 color;         // color of light
+    float falloffEnd;   // point/spot light only    
+    glm::vec3 direction;     // directional/spot light only
+    float spotPower;    // spotlight only
 };
 
 
@@ -92,6 +103,8 @@ struct Vertex {
         NumBindingLocations = 4,
     };
 };
+
+class VulkMesh;
 
 SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);

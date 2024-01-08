@@ -9,18 +9,6 @@
 #include "Vulk/VulkUniformBuffer.h"
 #include "Vulk/VulkStorageBuffer.h"
 #include "Vulk/VulkDescriptorSetUpdater.h"
-
-#pragma once
-
-#include "Vulk/Vulk.h"
-#include "Vulk/VulkGeo.h"
-#include "Vulk/VulkActor.h"
-#include "Vulk/VulkCamera.h"
-#include "Vulk/VulkPipelineBuilder.h"
-#include "Vulk/VulkDescriptorPoolBuilder.h"
-#include "Vulk/VulkUniformBuffer.h"
-#include "Vulk/VulkStorageBuffer.h"
-#include "Vulk/VulkDescriptorSetUpdater.h"
 #include "Vulk/VulkTextureView.h"
 
 class BlendingWorld

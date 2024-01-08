@@ -8,6 +8,8 @@
 #include "Samples/LitLandAndWaves.h"
 #include "Samples/TexturedScene.h"
 #include "Samples/Blending.h"
+#include "Samples/SampleRunner.h"
+#include "Samples/MirrorWorld.h"
 
 int main () {
     // VikingRoom sample;
@@ -17,7 +19,8 @@ int main () {
     // Lighting sample;
     // LitLandAndWaves sample;
     // TexturedScene sample;
-    Blending sample;
+    // Blending sample;
+    SampleRunner<MirrorWorld> sample;
     sample.run();
     return 0;
 }

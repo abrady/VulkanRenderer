@@ -4,6 +4,7 @@
 // will just declare the functions
 
 #include "VulkUtil.h"
+#include "VulkMesh.h"
 
 #pragma warning(push, 0) // assume these headers know what they're doing
 
