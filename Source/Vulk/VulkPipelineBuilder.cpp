@@ -2,7 +2,8 @@
 #include "Vulk.h"
 #include "VulkPipelineBuilder.h"
 
-VulkPipelineBuilder::VulkPipelineBuilder(Vulk &vk) : vk(vk) {
+VulkPipelineBuilder::VulkPipelineBuilder(Vulk &vk) : vk(vk)
+{
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.depthClampEnable = VK_FALSE;
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
@@ -46,11 +47,10 @@ VulkPipelineBuilder::VulkPipelineBuilder(Vulk &vk) : vk(vk) {
 
     dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
+        VK_DYNAMIC_STATE_SCISSOR};
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::addShaderStage(VkShaderStageFlagBits stage, char const *path)
+VulkPipelineBuilder &VulkPipelineBuilder::addShaderStage(VkShaderStageFlagBits stage, char const *path)
 {
     auto shaderCode = readFileIntoMem(path);
     VkShaderModule shaderModule = vk.createShaderModule(shaderCode);
@@ -66,12 +66,14 @@ VulkPipelineBuilder& VulkPipelineBuilder::addShaderStage(VkShaderStageFlagBits s
     return *this;
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::setPrimitiveTopology(VkPrimitiveTopology topology) {
+VulkPipelineBuilder &VulkPipelineBuilder::setPrimitiveTopology(VkPrimitiveTopology topology)
+{
     inputAssembly.topology = topology;
     return *this;
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::setLineWidth(float lineWidth) {
+VulkPipelineBuilder &VulkPipelineBuilder::setLineWidth(float lineWidth)
+{
     VkPhysicalDeviceProperties deviceProperties;
     vkGetPhysicalDeviceProperties(vk.physicalDevice, &deviceProperties);
     assert(deviceProperties.limits.lineWidthRange[0] <= lineWidth && lineWidth <= deviceProperties.limits.lineWidthRange[1]);
@@ -79,21 +81,24 @@ VulkPipelineBuilder& VulkPipelineBuilder::setLineWidth(float lineWidth) {
     return *this;
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::setCullMode(VkCullModeFlags cullMode) {
+VulkPipelineBuilder &VulkPipelineBuilder::setCullMode(VkCullModeFlags cullMode)
+{
     rasterizer.cullMode = cullMode;
     return *this;
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::setDepthTestEnabled(bool enabled) {
+VulkPipelineBuilder &VulkPipelineBuilder::setDepthTestEnabled(bool enabled)
+{
     depthStencil.depthTestEnable = enabled;
     return *this;
 }
-VulkPipelineBuilder& VulkPipelineBuilder::setDepthWriteEnabled(bool enabled) {
+VulkPipelineBuilder &VulkPipelineBuilder::setDepthWriteEnabled(bool enabled)
+{
     depthStencil.depthWriteEnable = enabled;
-    return *this;    
+    return *this;
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputBindingDescription(uint32_t binding, uint32_t stride, VkVertexInputRate inputRate)
+VulkPipelineBuilder &VulkPipelineBuilder::addVertexInputBindingDescription(uint32_t binding, uint32_t stride, VkVertexInputRate inputRate)
 {
     bindingDescription.binding = binding;
     bindingDescription.stride = stride;
@@ -101,7 +106,7 @@ VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputBindingDescription(uint3
     return *this;
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputField(uint32_t binding, uint32_t location, uint32_t offset, VkFormat format)
+VulkPipelineBuilder &VulkPipelineBuilder::addVertexInputField(uint32_t binding, uint32_t location, uint32_t offset, VkFormat format)
 {
     VkVertexInputAttributeDescription attributeDescription{};
     attributeDescription.binding = binding;
@@ -112,29 +117,30 @@ VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputField(uint32_t binding, 
     return *this;
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputFieldVec3(uint32_t binding, uint32_t location, uint32_t offset)
+VulkPipelineBuilder &VulkPipelineBuilder::addVertexInputFieldVec3(uint32_t binding, uint32_t location, uint32_t offset)
 {
     return addVertexInputField(binding, location, offset, VK_FORMAT_R32G32B32_SFLOAT);
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::addVertexInputFieldVec2(uint32_t binding, uint32_t location, uint32_t offset)
+VulkPipelineBuilder &VulkPipelineBuilder::addVertexInputFieldVec2(uint32_t binding, uint32_t location, uint32_t offset)
 {
     return addVertexInputField(binding, location, offset, VK_FORMAT_R32G32_SFLOAT);
 }
 
-VulkPipelineBuilder& VulkPipelineBuilder::addVulkVertexInput(uint32_t binding) {
-    return addVertexInputBindingDescription(binding,sizeof(Vertex))
+VulkPipelineBuilder &VulkPipelineBuilder::addVulkVertexInput(uint32_t binding)
+{
+    return addVertexInputBindingDescription(binding, sizeof(Vertex))
         .addVertexInputFieldVec3(binding, Vertex::PosBinding, offsetof(Vertex, pos))
         .addVertexInputFieldVec3(binding, Vertex::NormalBinding, offsetof(Vertex, normal))
         .addVertexInputFieldVec3(binding, Vertex::TangentBinding, offsetof(Vertex, tangent))
         .addVertexInputFieldVec2(binding, Vertex::TexCoordBinding, offsetof(Vertex, texCoord));
 }
 
-
-VulkPipelineBuilder& VulkPipelineBuilder::setBlendingEnabled(bool enabled, VkColorComponentFlags colorWriteMask)
+VulkPipelineBuilder &VulkPipelineBuilder::setBlendingEnabled(bool enabled, VkColorComponentFlags colorWriteMask)
 {
     colorBlendAttachment.blendEnable = enabled;
-    if (enabled) {
+    if (enabled)
+    {
         colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
@@ -185,7 +191,70 @@ void VulkPipelineBuilder::build(VkDescriptorSetLayout descriptorSetLayout, VkPip
 
     VK_CALL(vkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, graphicsPipeline));
 
-    for (auto shaderModule : shaderModules) {
+    for (auto shaderModule : shaderModules)
+    {
         vkDestroyShaderModule(vk.device, shaderModule, nullptr);
     }
 }
+
+VulkPipelineBuilder &VulkPipelineBuilder::setStencilTestEnabled(bool enabled)
+{
+    depthStencil.stencilTestEnable = enabled;
+    return *this;
+}
+
+VulkPipelineBuilder &VulkPipelineBuilder::setStencilFrontFailOp(VkStencilOp failOp)
+{
+    depthStencil.front.failOp = failOp;
+    return *this;
+}
+
+VulkPipelineBuilder &VulkPipelineBuilder::setFrontStencilPassOp(VkStencilOp passOp)
+{
+    depthStencil.front.passOp = passOp;
+    return *this;
+}
+
+VulkPipelineBuilder &VulkPipelineBuilder::setFrontStencilCompareOp(VkCompareOp compareOp)
+{
+    depthStencil.front.compareOp = compareOp;
+    return *this;
+}
+
+VulkPipelineBuilder &VulkPipelineBuilder::setFrontStencilCompareMask(uint32_t compareMask)
+{
+    depthStencil.front.compareMask = compareMask;
+    return *this;
+}
+
+VulkPipelineBuilder &VulkPipelineBuilder::setFrontStencilWriteMask(uint32_t writeMask)
+{
+    depthStencil.front.writeMask = writeMask;
+    return *this;
+}
+
+VulkPipelineBuilder &VulkPipelineBuilder::setFrontStencilReference(uint32_t reference)
+{
+    depthStencil.front.reference = reference;
+    return *this;
+}
+
+VulkPipelineBuilder &VulkPipelineBuilder::copyFrontStencilToBack()
+{
+    depthStencil.back = depthStencil.front;
+    return *this;
+}
+
+// TODO: figure stencil out
+// depthStencilState.front = {}; // Configure front faces
+// depthStencilState.back = {}; // Configure back faces
+// Configure stencil operations for front faces
+// depthStencilState.front.failOp = VK_STENCIL_OP_KEEP;
+// depthStencilState.front.passOp = VK_STENCIL_OP_REPLACE;
+// depthStencilState.front.depthFailOp = VK_STENCIL_OP_KEEP;
+// depthStencilState.front.compareOp = VK_COMPARE_OP_ALWAYS;
+// depthStencilState.front.compareMask = 0xFF;
+// depthStencilState.front.writeMask = 0xFF;
+// depthStencilState.front.reference = 1;
+// Configure stencil operations for back faces
+// depthStencilState.back = depthStencilState.front;

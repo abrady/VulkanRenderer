@@ -39,17 +39,20 @@
 
 #include "VulkDescriptorSetLayoutBuilder.h"
 
-#define VK_CALL(func) \
-do { \
-    VkResult vkcall_macro_result = (func); \
-    if (vkcall_macro_result != VK_SUCCESS) { \
-        std::cerr << "Vulkan error: " << string_VkResult(vkcall_macro_result) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-        throw std::runtime_error(std::string("Vulkan error: ") + string_VkResult(vkcall_macro_result) + " at " + __FILE__ + ":" + std::to_string(__LINE__)); \
-    } \
-} while (0)
+#define VK_CALL(func)                                                                                                                                            \
+    do                                                                                                                                                           \
+    {                                                                                                                                                            \
+        VkResult vkcall_macro_result = (func);                                                                                                                   \
+        if (vkcall_macro_result != VK_SUCCESS)                                                                                                                   \
+        {                                                                                                                                                        \
+            std::cerr << "Vulkan error: " << string_VkResult(vkcall_macro_result) << " at " << __FILE__ << ":" << __LINE__ << std::endl;                         \
+            throw std::runtime_error(std::string("Vulkan error: ") + string_VkResult(vkcall_macro_result) + " at " + __FILE__ + ":" + std::to_string(__LINE__)); \
+        }                                                                                                                                                        \
+    } while (0)
 
 // keep in sync with Source\Shaders\Common\common.glsl
-enum VulkShaderBindings {
+enum VulkShaderBindings
+{
     VulkShaderBinding_XformsUBO = 0,
     VulkShaderBinding_TextureSampler = 1,
     VulkShaderBinding_Actors = 2,
@@ -60,42 +63,48 @@ enum VulkShaderBindings {
     VulkShaderBinding_TextureSampler3 = 7,
     VulkShaderBinding_WavesXform = 8,
     VulkShaderBinding_NormalSampler = 9,
+    VulkShaderBinding_ModelXform = 10,
     VulkShaderBinding_MaxBindingID,
 };
 
 // keep in sync with Source\Shaders\Common\common.glsl
-struct VulkLight {
-    glm::vec3 pos;           // point light only
-    float falloffStart; // point/spot light only
-    glm::vec3 color;         // color of light
-    float falloffEnd;   // point/spot light only    
-    glm::vec3 direction;     // directional/spot light only
-    float spotPower;    // spotlight only
+struct VulkLight
+{
+    glm::vec3 pos;       // point light only
+    float falloffStart;  // point/spot light only
+    glm::vec3 color;     // color of light
+    float falloffEnd;    // point/spot light only
+    glm::vec3 direction; // directional/spot light only
+    float spotPower;     // spotlight only
 };
 
-
-struct QueueFamilyIndices {
+struct QueueFamilyIndices
+{
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
 
-    bool isComplete() {
+    bool isComplete()
+    {
         return graphicsFamily.has_value() && presentFamily.has_value();
     }
 };
 
-struct SwapChainSupportDetails {
+struct SwapChainSupportDetails
+{
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct Vertex {
+struct Vertex
+{
     glm::vec3 pos;
     glm::vec3 normal;
     glm::vec3 tangent;
     glm::vec2 texCoord;
 
-    enum BindingLocations {
+    enum BindingLocations
+    {
         PosBinding = 0,
         NormalBinding = 1,
         TangentBinding = 2,
@@ -109,5 +118,4 @@ class VulkMesh;
 SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
 void loadModel(char const *model_path, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices);
-std::vector<char> readFileIntoMem(const std::string& filename);
-
+std::vector<char> readFileIntoMem(const std::string &filename);

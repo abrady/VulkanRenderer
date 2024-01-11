@@ -62,7 +62,9 @@ public:
     VkSampler textureSampler;
 
     std::unique_ptr<VulkMeshRender> skull;
-
+    VkImage mirrorImage;
+    VkDeviceMemory mirrorImageMemory;
+    VkImageView mirrorImageView;
 public:
     MirrorWorld(Vulk &vk) : vk(vk),
                             frameUBOs(vk),
@@ -111,6 +113,17 @@ public:
                 .addImageSampler(skullNormalView.textureImageView, textureSampler, VulkShaderBinding_NormalSampler)
                 .update(vk.device);
         }
+
+        // Create a VkPipelineDepthStencilStateCreateInfo structure
+        VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+        depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencil.depthTestEnable = VK_TRUE;
+        depthStencil.depthWriteEnable = VK_TRUE;
+        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        depthStencil.depthBoundsTestEnable = VK_FALSE;
+        depthStencil.stencilTestEnable = VK_TRUE;
+
+        
     }
 
     void updateXformsUBO(XformsUBO &ubo, VkViewport const &viewport)

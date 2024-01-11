@@ -1,7 +1,7 @@
 {
     "files.associations": {
-        "*.frag": "hlsl",
-        "*.vert": "hlsl",
+        "*.frag": "glsl",
+        "*.vert": "glsl",
         "stdexcept": "cpp",
         "array": "cpp",
         "iterator": "cpp",
@@ -71,6 +71,8 @@
         "xlocnum": "cpp",
         "xloctime": "cpp",
         "xmemory": "cpp",
-        "xtr1common": "cpp"
+        "xtr1common": "cpp",
+        "mutex": "cpp",
+        "xstddef": "cpp"
     }
 }

@@ -10,8 +10,10 @@
 #include "Samples/Blending.h"
 #include "Samples/SampleRunner.h"
 #include "Samples/MirrorWorld.h"
+#include "Samples/OutlineWorld.h"
 
-int main () {
+int main()
+{
     // VikingRoom sample;
     // ShapeGeometry sample;
     // Scene sample;
@@ -20,7 +22,8 @@ int main () {
     // LitLandAndWaves sample;
     // TexturedScene sample;
     // Blending sample;
-    SampleRunner<MirrorWorld> sample;
+    // SampleRunner<MirrorWorld> sample;
+    SampleRunner<OutlineWorld> sample;
     sample.run();
     return 0;
 }

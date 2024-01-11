@@ -17,6 +17,7 @@ Some quick thoughts on my approach: one thing you might notice is that I avoid w
 6. [LitLandAndWaves](/Source/Samples/LitLandAndWaves.h) - lighting applied to the land and waves scene
 7. [TexturedScene](/Source/Samples/TexturedScene.h) - blended textures applied to the land and waves scene, with lighting.
 8. [Blending](/Source/Samples/Blending.h)
+9. [Outline With Stencil](/Source/Samples/OutlineWorld.h) - using the stencil buffer to make an outline
 
 # Resources
 * [Vulkan Tutorial](https://vulkan-tutorial.com/Introduction)
@@ -44,6 +45,20 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
     * x update the descriptor set
 
 # Log
+
+## 1/11/24 first stencil: outline
+The OutlineWorld sample works by rendering the model twice:
+1. the first time it writes the stencil buffer for each pixel affected by the model
+2. the second time it renders the model slightly larger (10%) and only writes stencil pixels that have failed comparison
+
+![](Assets/Screenshots/stencil_outline_working.png)
+
+here's the working example
+
+![](Assets/Screenshots/stencile_outline_artifacts.png)
+
+when I move the skull around, however, it doesn't work. I need to figure out what's going on here (probably not clearing properly), a problem for another day. goodnight!
+
 
 ## 1/8/24 skull load with normal texture
 I downloaded a model from [Turbo Squid](https://www.turbosquid.com/3d-models/nextgen-skull-3d-model/552621)
