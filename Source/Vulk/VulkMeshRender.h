@@ -2,7 +2,6 @@
 
 #include "Vulk.h"
 
-
 struct VulkMeshRender
 {
     Vulk &vk;
@@ -15,7 +14,7 @@ struct VulkMeshRender
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorPool descriptorPool;
     VkPipelineLayout pipelineLayout;
-    VkPipeline graphicsPipeline;
+    VkPipeline pipeline;
     VkDescriptorSet descriptorSets[MAX_FRAMES_IN_FLIGHT];
     uint32_t numIndices;
 
@@ -46,6 +45,6 @@ struct VulkMeshRender
         vkDestroyDescriptorSetLayout(vk.device, descriptorSetLayout, nullptr);
         vkDestroyDescriptorPool(vk.device, descriptorPool, nullptr);
         vkDestroyPipelineLayout(vk.device, pipelineLayout, nullptr);
-        vkDestroyPipeline(vk.device, graphicsPipeline, nullptr);
+        vkDestroyPipeline(vk.device, pipeline, nullptr);
     }
 };

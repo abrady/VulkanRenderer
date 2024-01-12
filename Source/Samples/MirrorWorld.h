@@ -100,7 +100,7 @@ public:
             .setDepthTestEnabled(true)
             .setDepthWriteEnabled(true)
             .setBlendingEnabled(true)
-            .build(skull->descriptorSetLayout, &skull->pipelineLayout, &skull->graphicsPipeline);
+            .build(skull->descriptorSetLayout, &skull->pipelineLayout, &skull->pipeline);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -148,7 +148,7 @@ public:
         *frameUBOs.eyePos[currentFrame].mappedUBO = camera.eye;
 
         // skull
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skull->graphicsPipeline);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skull->pipeline);
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &skull->vertexBuffer, offsets);

@@ -61,8 +61,11 @@ public:
     VulkTextureView skullTextureView,
         skullNormalView;
     VkSampler textureSampler;
-
     std::unique_ptr<VulkMeshRender> skull;
+
+    std::unique_ptr<VulkMeshRender> wall;
+    VulkTextureView wallTextureView,
+        wallNormalsView;
 
     struct Outline
     {
@@ -98,6 +101,8 @@ public:
                              skullUBOs(vk),
                              skullTextureView(vk, "Assets/Models/Skull/DiffuseMap.png"),
                              skullNormalView(vk, "Assets/Models/Skull/NormalMap.png"),
+                             wallTextureView(vk, "Assets/Textures/RedBrick/RedBrick.jpg"),
+                             wallNormalsView(vk, "Assets/Textures/RedBrick/RedBrickNormal.jpg"),
                              outline(vk)
     {
         skullUBOs.light.mappedUBO->pos = glm::vec3(2.0f, .5f, .5f);
@@ -135,7 +140,7 @@ public:
             .setFrontStencilWriteMask(0xFF)                 // allow write to all bits
             .setFrontStencilReference(1)                    // value to write to the stencil buffer
             .copyFrontStencilToBack()                       // we cull back facing triangles, but putting this here to show it exists even though it's not used
-            .build(skull->descriptorSetLayout, &skull->pipelineLayout, &skull->graphicsPipeline);
+            .build(skull->descriptorSetLayout, &skull->pipelineLayout, &skull->pipeline);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -149,6 +154,45 @@ public:
                 .update(vk.device);
         }
 
+        // wall which just shows the outline
+        VulkMesh wallMesh;
+        makeQuad(2.0f, 2.0f, 1, wallMesh);
+        wallMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 1.0f)));
+        wall = std::make_unique<VulkMeshRender>(vk, wallMesh);
+        wall->descriptorSetLayout = VulkDescriptorSetLayoutBuilder(vk)
+                                        .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
+                                        .addUniformBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
+                                        .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
+                                        .addSampler(VulkShaderBinding_TextureSampler)
+                                        .addSampler(VulkShaderBinding_NormalSampler)
+                                        .build();
+
+        wall->descriptorPool = VulkDescriptorPoolBuilder(vk)
+                                   .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 3)
+                                   .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * 2)
+                                   .build(MAX_FRAMES_IN_FLIGHT);
+
+        VulkPipelineBuilder(vk)
+            .addVertexShaderStage("Source/Shaders/Vert/LitModel.spv")
+            .addFragmentShaderStage("Source/Shaders/Frag/LitModel.spv")
+            .addVulkVertexInput(0)
+            .setDepthTestEnabled(true)
+            .setDepthWriteEnabled(true)
+            .setStencilTestEnabled(false)
+            .build(wall->descriptorSetLayout, &wall->pipelineLayout, &wall->pipeline);
+
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            wall->descriptorSets[i] = vk.createDescriptorSet(wall->descriptorSetLayout, wall->descriptorPool);
+            VulkDescriptorSetUpdater(wall->descriptorSets[i])
+                .addUniformBuffer(skullUBOs.xforms[i].buf, skullUBOs.xforms[i].getSize(), VulkShaderBinding_XformsUBO) // same transform as the skull
+                .addUniformBuffer(skullUBOs.eyePos[i].buf, skullUBOs.eyePos[i].getSize(), VulkShaderBinding_EyePos)
+                .addUniformBuffer(skullUBOs.light.buf, skullUBOs.light.getSize(), VulkShaderBinding_Lights)
+                .addImageSampler(wallTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler)
+                .addImageSampler(wallNormalsView.textureImageView, textureSampler, VulkShaderBinding_NormalSampler)
+                .update(vk.device);
+        }
+
         // pass 2
         outline.descriptorSetLayout = VulkDescriptorSetLayoutBuilder(vk)
                                           .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
@@ -159,7 +203,7 @@ public:
             .addVertexShaderStage("Source/Shaders/Vert/Outline.spv")
             .addFragmentShaderStage("Source/Shaders/Frag/Outline.spv")
             .addVulkVertexInput(0)
-            .setDepthTestEnabled(true)
+            .setDepthTestEnabled(false)
             .setDepthWriteEnabled(false)
             .setStencilTestEnabled(true)
             .setStencilFrontFailOp(VK_STENCIL_OP_KEEP)         // keep the stencil buffer unchanged
@@ -183,7 +227,7 @@ public:
                 .addUniformBuffer(outline.xforms[i].buf, outline.xforms[i].getSize(), VulkShaderBinding_ModelXform)
                 .update(vk.device);
 
-            *outline.xforms[i].mappedUBO = glm::scale(glm::mat4(1.0f), glm::vec3(1.1f));
+            *outline.xforms[i].mappedUBO = glm::scale(glm::mat4(1.0f), glm::vec3(1.01f));
         }
     }
 
@@ -209,7 +253,7 @@ public:
         *skullUBOs.eyePos[currentFrame].mappedUBO = camera.eye;
 
         // skull
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skull->graphicsPipeline);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skull->pipeline);
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &skull->vertexBuffer, offsets);
@@ -217,7 +261,14 @@ public:
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skull->pipelineLayout, 0, 1, &skull->descriptorSets[currentFrame], 0, nullptr);
         vkCmdDrawIndexed(commandBuffer, (uint32_t)skull->numIndices, 1, 0, 0, 0);
 
-        // outline
+        // wall
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wall->pipeline);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &wall->vertexBuffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, wall->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, wall->pipelineLayout, 0, 1, &wall->descriptorSets[currentFrame], 0, nullptr);
+        vkCmdDrawIndexed(commandBuffer, (uint32_t)wall->numIndices, 1, 0, 0, 0);
+
+        // skull outline
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, outline.pipeline);
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &skull->vertexBuffer, offsets);
         vkCmdBindIndexBuffer(commandBuffer, skull->indexBuffer, 0, VK_INDEX_TYPE_UINT32);

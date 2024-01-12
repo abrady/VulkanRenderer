@@ -2,7 +2,7 @@
 
 #include "common.glsl"
 
-layout(binding = 0) uniform UniformBufferObject {
+layout(binding = VulkShaderBinding_XformsUBO) uniform UniformBufferObject {
     mat4 model;
     mat4 view;
     mat4 proj;

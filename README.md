@@ -38,6 +38,7 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 # TODOs
 * it feels like the descriptor set layout could inform the descriptor pool allocator and descriptor set updater...
     * maybe we can have an 'addVertexBindings' for VulkPipelineBuilder that just does that boilerplate.
+* document some of the annoying things I'm finally getting around to coding around.
 
 * need per-actor materials:
     * x update descriptors set layout
@@ -45,6 +46,15 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
     * x update the descriptor set
 
 # Log
+
+## 1/11/24 stenciled outline of skull behind wall
+
+![](Assets/Screenshots/skull_behind_wall_outline.png)
+
+here's a quick example of the stenciling showing the skull behind a wall a'la any game that shows other players or enemy outlines. pretty straightforward:
+1. render the skull with stencil write on passing pixels
+2. render the wall
+3. render the skull 1% larger with stencil set to accept only failing tests and with depth buffer turned off
 
 ## 1/11/24 first stencil: outline
 The OutlineWorld sample works by rendering the model twice:
