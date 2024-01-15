@@ -10,7 +10,58 @@
 #include "Vulk/VulkStorageBuffer.h"
 #include "Vulk/VulkDescriptorSetUpdater.h"
 #include "Vulk/VulkTextureView.h"
-#include "Vulk/VulkMeshRender.h"
+
+// to render a mesh you typically need:
+// - verts and indices
+// - the vert and index buffers and memory to get passed into the draw calls
+// - a descriptor set layout for what you're passing to the pipeline's shaders and a pool to allocate from
+// - the descriptor set which holds the globals like textures, UBOs, and SSBOs
+struct VulkMeshRender
+{
+    Vulk &vk;
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
+
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+    VkPipelineLayout pipelineLayout;
+    VkPipeline pipeline;
+    VkDescriptorSet descriptorSets[MAX_FRAMES_IN_FLIGHT];
+    uint32_t numIndices;
+
+    VulkMeshRender(Vulk &vk, VulkMesh const &mesh) : vk(vk)
+    {
+        auto &vertices = mesh.vertices;
+        auto &indices = mesh.indices;
+        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+        vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+        bufferSize = sizeof(indices[0]) * indices.size();
+        vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+        bufferSize = sizeof(vertices[0]) * vertices.size();
+        vk.copyFromMemToBuffer(vertices.data(), vertexBuffer, bufferSize);
+
+        bufferSize = sizeof(indices[0]) * indices.size();
+        vk.copyFromMemToBuffer(indices.data(), indexBuffer, bufferSize);
+
+        numIndices = (uint32_t)indices.size();
+    }
+
+    ~VulkMeshRender()
+    {
+        vkDestroyBuffer(vk.device, vertexBuffer, nullptr);
+        vkFreeMemory(vk.device, vertexBufferMemory, nullptr);
+        vkDestroyBuffer(vk.device, indexBuffer, nullptr);
+        vkFreeMemory(vk.device, indexBufferMemory, nullptr);
+        vkDestroyDescriptorSetLayout(vk.device, descriptorSetLayout, nullptr);
+        vkDestroyDescriptorPool(vk.device, descriptorPool, nullptr);
+        vkDestroyPipelineLayout(vk.device, pipelineLayout, nullptr);
+        vkDestroyPipeline(vk.device, pipeline, nullptr);
+    }
+};
 
 class OutlineWorld
 {

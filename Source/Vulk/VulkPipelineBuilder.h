@@ -2,6 +2,23 @@
 
 #include <vulkan/vulkan.h>
 
+struct VulkPipeline
+{
+    Vulk &vk;
+    VkPipeline pipeline;
+    VkPipelineLayout pipelineLayout;
+
+    VulkPipeline(Vulk &vk, VkPipeline pipeline, VkPipelineLayout pipelineLayout)
+        : vk(vk), pipeline(pipeline), pipelineLayout(pipelineLayout)
+    {
+    }
+    ~VulkPipeline()
+    {
+        vkDestroyPipeline(vk.device, pipeline, nullptr);
+        vkDestroyPipelineLayout(vk.device, pipelineLayout, nullptr);
+    }
+};
+
 class VulkPipelineBuilder
 {
     Vulk &vk;
@@ -68,4 +85,11 @@ public:
     VulkPipelineBuilder &setBlendingEnabled(bool enabled, VkColorComponentFlags colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT);
 
     void build(VkDescriptorSetLayout descriptorSetLayout, VkPipelineLayout *pipelineLayout, VkPipeline *graphicsPipeline);
+    std::unique_ptr<VulkPipeline> build(VkDescriptorSetLayout descriptorSetLayout)
+    {
+        VkPipelineLayout pipelineLayout;
+        VkPipeline graphicsPipeline;
+        build(descriptorSetLayout, &pipelineLayout, &graphicsPipeline);
+        return std::make_unique<VulkPipeline>(vk, graphicsPipeline, pipelineLayout);
+    }
 };

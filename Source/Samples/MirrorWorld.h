@@ -10,7 +10,172 @@
 #include "Vulk/VulkStorageBuffer.h"
 #include "Vulk/VulkDescriptorSetUpdater.h"
 #include "Vulk/VulkTextureView.h"
-#include "Vulk/VulkMeshRender.h"
+
+struct MeshResources
+{
+    Vulk &vk;
+    VulkMesh mesh;
+    VulkTextureView textureView;
+    VulkTextureView normalView;
+
+    MeshResources(Vulk &vk, VulkMesh &&mesh, std::string const &texturePath, std::string const &normalPath)
+        : vk(vk),
+          mesh(std::move(mesh)),
+          textureView(vk, texturePath),
+          normalView(vk, normalPath) {}
+};
+
+struct DescriptorSetInfo
+{
+    Vulk &vk;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+    std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets;
+
+    DescriptorSetInfo(Vulk &vk, VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> &&descriptorSets)
+        : vk(vk),
+          descriptorSetLayout(descriptorSetLayout),
+          descriptorPool(descriptorPool),
+          descriptorSets(std::move(descriptorSets)) {}
+
+    ~DescriptorSetInfo()
+    {
+        vkDestroyDescriptorPool(vk.device, descriptorPool, nullptr);
+        vkDestroyDescriptorSetLayout(vk.device, descriptorSetLayout, nullptr);
+    }
+};
+
+class DescriptorSetInfoBuilder
+{
+    Vulk &vk;
+    VulkDescriptorSetLayoutBuilder layoutBuilder;
+    VulkDescriptorPoolBuilder poolBuilder;
+    struct BufSetUpdaterInfo
+    {
+        VkBuffer buf;
+        VkDeviceSize range;
+    };
+    std::unordered_map<VulkShaderUBOBindings, BufSetUpdaterInfo> uniformSetInfos;
+    std::unordered_map<VulkShaderSSBOBindings, BufSetUpdaterInfo> ssboSetInfos;
+
+    struct SamplerSetUpdaterInfo
+    {
+        VkImageView imageView;
+        VkSampler sampler;
+    };
+    std::unordered_map<VulkShaderTextureBindings, SamplerSetUpdaterInfo> samplerSetInfos;
+
+public:
+    DescriptorSetInfoBuilder(Vulk &vk) : vk(vk), layoutBuilder(vk), poolBuilder(vk) {}
+
+    DescriptorSetInfoBuilder &addUniformBuffer(VkShaderStageFlags stageFlags, VulkShaderUBOBindings bindingID, VkBuffer buf, VkDeviceSize range)
+    {
+        layoutBuilder.addUniformBuffer(bindingID, stageFlags);
+        poolBuilder.addUniformBufferCount(MAX_FRAMES_IN_FLIGHT);
+        uniformSetInfos[bindingID] = {buf, range};
+        return *this;
+    }
+
+    DescriptorSetInfoBuilder &addStorageBuffer(VkShaderStageFlags stageFlags, VulkShaderSSBOBindings bindingID, VkBuffer buf, VkDeviceSize range)
+    {
+        layoutBuilder.addStorageBuffer(bindingID, stageFlags);
+        poolBuilder.addStorageBufferCount(MAX_FRAMES_IN_FLIGHT);
+        ssboSetInfos[bindingID] = {buf, range};
+        return *this;
+    }
+
+    DescriptorSetInfoBuilder &addImageSampler(VkShaderStageFlags stageFlags, VulkShaderTextureBindings bindingID, VkImageView imageView, VkSampler sampler)
+    {
+        layoutBuilder.addSampler(bindingID, stageFlags);
+        poolBuilder.addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT);
+        samplerSetInfos[bindingID] = {imageView, sampler};
+        return *this;
+    }
+
+    std::unique_ptr<DescriptorSetInfo> build()
+    {
+        VkDescriptorSetLayout descriptorSetLayout = layoutBuilder.build();
+        VkDescriptorPool pool = poolBuilder.build(MAX_FRAMES_IN_FLIGHT);
+        std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets;
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            descriptorSets[i] = vk.createDescriptorSet(descriptorSetLayout, pool);
+            VulkDescriptorSetUpdater updater = VulkDescriptorSetUpdater(descriptorSets[i]);
+
+            for (auto &pair : uniformSetInfos)
+            {
+                updater.addUniformBuffer(pair.second.buf, pair.second.range, pair.first);
+            }
+            for (auto &pair : ssboSetInfos)
+            {
+                updater.addStorageBuffer(pair.second.buf, pair.second.range, pair.first);
+            }
+            for (auto &pair : samplerSetInfos)
+            {
+                updater.addImageSampler(pair.second.imageView, pair.second.sampler, pair.first);
+            }
+
+            updater.update(vk.device);
+        }
+        return std::make_unique<DescriptorSetInfo>(vk, descriptorSetLayout, pool, std::move(descriptorSets));
+    }
+};
+
+class Renderable
+{
+    std::unique_ptr<DescriptorSetInfo> dsInfo;
+    std::unique_ptr<VulkPipeline> plInfo;
+    Vulk &vk;
+    uint32_t numIndices;
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
+
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+
+public:
+    Renderable(Vulk &vk, VulkMesh const &mesh, std::unique_ptr<DescriptorSetInfo> &&dsInfo, std::unique_ptr<VulkPipeline> &&plInfo)
+        : vk(vk),
+          numIndices((uint32_t)mesh.indices.size()),
+          dsInfo(std::move(dsInfo)),
+          plInfo(std::move(plInfo))
+
+    {
+        auto &vertices = mesh.vertices;
+        auto &indices = mesh.indices;
+        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+        vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+        bufferSize = sizeof(indices[0]) * indices.size();
+        vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+
+        bufferSize = sizeof(vertices[0]) * vertices.size();
+        vk.copyFromMemToBuffer(vertices.data(), vertexBuffer, bufferSize);
+
+        bufferSize = sizeof(indices[0]) * indices.size();
+        vk.copyFromMemToBuffer(indices.data(), indexBuffer, bufferSize);
+    }
+
+    void render(VkCommandBuffer commandBuffer, uint32_t currentFrame, VkViewport const &viewport, VkRect2D const &scissor)
+    {
+        VkDeviceSize offsets[] = {0};
+
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, plInfo->pipeline);
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, plInfo->pipelineLayout, 0, 1, &dsInfo->descriptorSets[currentFrame], 0, nullptr);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
+    }
+
+    ~Renderable()
+    {
+        vkDestroyBuffer(vk.device, vertexBuffer, nullptr);
+        vkFreeMemory(vk.device, vertexBufferMemory, nullptr);
+        vkDestroyBuffer(vk.device, indexBuffer, nullptr);
+        vkFreeMemory(vk.device, indexBufferMemory, nullptr);
+    }
+};
 
 class MirrorWorld
 {
@@ -25,13 +190,13 @@ public:
         alignas(16) glm::mat4 proj;
     };
 
-    struct FrameUBOs
+    struct ModelUBOs
     {
         Vulk &vk;
         std::array<VulkUniformBuffer<XformsUBO>, MAX_FRAMES_IN_FLIGHT> xforms;
         std::array<VulkUniformBuffer<glm::vec3>, MAX_FRAMES_IN_FLIGHT> eyePos;
         VulkUniformBuffer<VulkLight> light;
-        FrameUBOs(Vulk &vk) : vk(vk)
+        ModelUBOs(Vulk &vk) : vk(vk)
         {
             for (auto &ubo : xforms)
             {
@@ -43,7 +208,7 @@ public:
             }
             light.init(vk);
         }
-        ~FrameUBOs()
+        ~ModelUBOs()
         {
             for (auto &ubo : xforms)
             {
@@ -56,74 +221,65 @@ public:
             light.cleanup(vk);
         }
     };
-    FrameUBOs frameUBOs;
+    ModelUBOs modelUBOs;
 
-    VulkTextureView skullTextureView, skullNormalView;
     VkSampler textureSampler;
+    std::unique_ptr<MeshResources> wallResources, skullResources;
 
-    std::unique_ptr<VulkMeshRender> skull;
-    VkImage mirrorImage;
-    VkDeviceMemory mirrorImageMemory;
-    VkImageView mirrorImageView;
+    std::unique_ptr<Renderable> wallRenderable, skullRenderable;
+
 public:
     MirrorWorld(Vulk &vk) : vk(vk),
-                            frameUBOs(vk),
-                            skullTextureView(vk, "Assets/Models/Skull/DiffuseMap.png"),
-                            skullNormalView(vk, "Assets/Models/Skull/NormalMap.png")
+                            modelUBOs(vk)
     {
-        frameUBOs.light.mappedUBO->pos = glm::vec3(2.0f, .5f, .5f);
-        frameUBOs.light.mappedUBO->color = glm::vec3(.7f, .7f, .7f);
+        // load resources
 
-        textureSampler = vk.createTextureSampler();
+        VulkMesh wallMesh;
+        makeQuad(2.0f, 2.0f, 1, wallMesh);
+        wallMesh.xform(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.f)));
+
+        wallResources = std::make_unique<MeshResources>(vk, std::move(wallMesh), "Assets/Textures/RedBrick/RedBrick.jpg", "Assets/Textures/RedBrick/RedBrickNormal.jpg");
+        skullResources = std::make_unique<MeshResources>(vk, VulkMesh::loadFromFile("Assets/Models/Skull/Skull.obj"), "Assets/Models/Skull/DiffuseMap.png", "Assets/Models/Skull/NormalMap.png");
+
+        // set up render globals
+
+        modelUBOs.light.mappedUBO->pos = glm::vec3(2.0f, .5f, .5f);
+        modelUBOs.light.mappedUBO->color = glm::vec3(.7f, .7f, .7f);
         camera.lookAt(glm::vec3(0.0f, 0.f, 1.3f), glm::vec3(0.f, 0.f, 0.f));
 
-        skull = std::make_unique<VulkMeshRender>(vk, VulkMesh::loadFromFile("Assets/Models/Skull/Skull.obj"));
-        skull->descriptorSetLayout = VulkDescriptorSetLayoutBuilder(vk)
-                                         .addUniformBuffer(VulkShaderBinding_XformsUBO, VK_SHADER_STAGE_VERTEX_BIT)
-                                         .addUniformBuffer(VulkShaderBinding_Lights, VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .addUniformBuffer(VulkShaderBinding_EyePos, VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .addSampler(VulkShaderBinding_TextureSampler)
-                                         .addSampler(VulkShaderBinding_NormalSampler)
-                                         .build();
+        textureSampler = vk.createTextureSampler();
 
-        skull->descriptorPool = VulkDescriptorPoolBuilder(vk)
-                                    .addUniformBufferCount(MAX_FRAMES_IN_FLIGHT * 3)
-                                    .addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT * 2)
-                                    .build(MAX_FRAMES_IN_FLIGHT);
+        // set up descriptors
 
-        VulkPipelineBuilder(vk)
-            .addVertexShaderStage("Source/Shaders/Vert/LitModel.spv")
-            .addFragmentShaderStage("Source/Shaders/Frag/LitModel.spv")
-            .addVulkVertexInput(0)
-            .setPrimitiveTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-            .setCullMode(VK_CULL_MODE_BACK_BIT)
-            .setDepthTestEnabled(true)
-            .setDepthWriteEnabled(true)
-            .setBlendingEnabled(true)
-            .build(skull->descriptorSetLayout, &skull->pipelineLayout, &skull->pipeline);
+        DescriptorSetInfoBuilder dsBuilder = DescriptorSetInfoBuilder(vk)
+                                                 .addUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT, VulkShaderUBOBinding_Xforms, modelUBOs.xforms[0].buf, modelUBOs.xforms[0].getSize())
+                                                 .addUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_EyePos, modelUBOs.eyePos[0].buf, modelUBOs.eyePos[0].getSize())
+                                                 .addUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_Lights, modelUBOs.light.buf, modelUBOs.light.getSize());
 
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-        {
-            skull->descriptorSets[i] = vk.createDescriptorSet(skull->descriptorSetLayout, skull->descriptorPool);
-            VulkDescriptorSetUpdater(skull->descriptorSets[i])
-                .addUniformBuffer(frameUBOs.xforms[i].buf, frameUBOs.xforms[i].getSize(), VulkShaderBinding_XformsUBO)
-                .addUniformBuffer(frameUBOs.eyePos[i].buf, frameUBOs.eyePos[i].getSize(), VulkShaderBinding_EyePos)
-                .addUniformBuffer(frameUBOs.light.buf, frameUBOs.light.getSize(), VulkShaderBinding_Lights)
-                .addImageSampler(skullTextureView.textureImageView, textureSampler, VulkShaderBinding_TextureSampler)
-                .addImageSampler(skullNormalView.textureImageView, textureSampler, VulkShaderBinding_NormalSampler)
-                .update(vk.device);
-        }
+        std::unique_ptr<DescriptorSetInfo> skullDS = DescriptorSetInfoBuilder(dsBuilder)
+                                                         .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, skullResources->textureView.textureImageView, textureSampler)
+                                                         .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, skullResources->normalView.textureImageView, textureSampler)
+                                                         .build();
+        std::unique_ptr<DescriptorSetInfo> wallDS = DescriptorSetInfoBuilder(dsBuilder)
+                                                        .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, wallResources->textureView.textureImageView, textureSampler)
+                                                        .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, wallResources->normalView.textureImageView, textureSampler)
+                                                        .build();
 
-        // Create a VkPipelineDepthStencilStateCreateInfo structure
-        VkPipelineDepthStencilStateCreateInfo depthStencil = {};
-        depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        depthStencil.depthTestEnable = VK_TRUE;
-        depthStencil.depthWriteEnable = VK_TRUE;
-        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-        depthStencil.depthBoundsTestEnable = VK_FALSE;
-        depthStencil.stencilTestEnable = VK_TRUE;
+        // and finally the pipelines
+        std::unique_ptr<VulkPipeline> skullPipeline = VulkPipelineBuilder(vk)
+                                                          .addVertexShaderStage("Source/Shaders/Vert/LitModel.spv")
+                                                          .addFragmentShaderStage("Source/Shaders/Frag/LitModel.spv")
+                                                          .addVulkVertexInput(0)
+                                                          .build(skullDS->descriptorSetLayout);
+        std::unique_ptr<VulkPipeline> wallPipeline = VulkPipelineBuilder(vk)
+                                                         .addVertexShaderStage("Source/Shaders/Vert/LitModel.spv")
+                                                         .addFragmentShaderStage("Source/Shaders/Frag/LitModel.spv")
+                                                         .addVulkVertexInput(0)
+                                                         .build(wallDS->descriptorSetLayout);
 
-        
+        // pass ownership of everything off to the renderable.
+        wallRenderable = std::make_unique<Renderable>(vk, wallResources->mesh, std::move(wallDS), std::move(wallPipeline));
+        skullRenderable = std::make_unique<Renderable>(vk, skullResources->mesh, std::move(skullDS), std::move(skullPipeline));
     }
 
     void updateXformsUBO(XformsUBO &ubo, VkViewport const &viewport)
@@ -143,18 +299,11 @@ public:
 
     void render(VkCommandBuffer commandBuffer, uint32_t currentFrame, VkViewport const &viewport, VkRect2D const &scissor)
     {
-        VkDeviceSize offsets[] = {0};
-        updateXformsUBO(*frameUBOs.xforms[currentFrame].mappedUBO, viewport);
-        *frameUBOs.eyePos[currentFrame].mappedUBO = camera.eye;
+        updateXformsUBO(*modelUBOs.xforms[currentFrame].mappedUBO, viewport);
+        *modelUBOs.eyePos[currentFrame].mappedUBO = camera.eye;
 
-        // skull
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skull->pipeline);
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &skull->vertexBuffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, skull->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, skull->pipelineLayout, 0, 1, &skull->descriptorSets[currentFrame], 0, nullptr);
-        vkCmdDrawIndexed(commandBuffer, (uint32_t)skull->numIndices, 1, 0, 0, 0);
+        skullRenderable->render(commandBuffer, currentFrame, viewport, scissor);
+        wallRenderable->render(commandBuffer, currentFrame, viewport, scissor);
     }
 
     ~MirrorWorld()

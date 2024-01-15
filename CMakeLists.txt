@@ -195,6 +195,8 @@ set(VULKAN_RENDERER_SOURCES
 
 add_executable (VulkanRenderer "Source/main.cpp" ${VULKAN_RENDERER_SOURCES})
 if(MSVC)
+  # /analyze - /analyze:warninglevel 4
+  # /fsanitize=address /fsanitize=fuzzer
   target_compile_options(VulkanRenderer PRIVATE /W4 /WX)
 else()
   target_compile_options(VulkanRenderer PRIVATE -Wall -Wextra -pedantic -Werror)

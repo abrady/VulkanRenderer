@@ -6,14 +6,19 @@ class VulkDescriptorPoolBuilder
 {
 private:
     Vulk &vk;
-    std::vector<VkDescriptorPoolSize> poolSizes;
+    std::unordered_map<VkDescriptorType, VkDescriptorPoolSize> poolSizes;
 
     VulkDescriptorPoolBuilder &addPoolSizeCount(VkDescriptorType type, uint32_t count)
     {
+        uint32_t existingCount = 0;
+        if (poolSizes.find(type) != poolSizes.end())
+        {
+            existingCount = poolSizes[type].descriptorCount;
+        }
         VkDescriptorPoolSize poolSize{};
         poolSize.type = type;
-        poolSize.descriptorCount = count;
-        poolSizes.push_back(poolSize);
+        poolSize.descriptorCount = existingCount + count;
+        poolSizes[type] = poolSize;
         return *this;
     }
 
@@ -41,10 +46,15 @@ public:
 
     VkDescriptorPool build(uint32_t maxSets)
     {
+        std::vector<VkDescriptorPoolSize> poolSizesVector;
+        for (auto &kv : poolSizes)
+        {
+            poolSizesVector.push_back(kv.second);
+        }
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizesVector.size());
+        poolInfo.pPoolSizes = poolSizesVector.data();
         poolInfo.maxSets = maxSets;
 
         VkDescriptorPool descriptorPool;

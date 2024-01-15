@@ -23,7 +23,8 @@ int main()
     // TexturedScene sample;
     // Blending sample;
     // SampleRunner<MirrorWorld> sample;
-    SampleRunner<OutlineWorld> sample;
+    // SampleRunner<OutlineWorld> sample;
+    SampleRunner<MirrorWorld> sample;
     sample.run();
     return 0;
 }

@@ -36,9 +36,8 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 * run `cmake -S . -B build` from the root of the project
 
 # TODOs
-* it feels like the descriptor set layout could inform the descriptor pool allocator and descriptor set updater...
-    * maybe we can have an 'addVertexBindings' for VulkPipelineBuilder that just does that boilerplate.
 * document some of the annoying things I'm finally getting around to coding around.
+* VulkPipelineBuilder should use a set for stages and error if they already exist...
 
 * need per-actor materials:
     * x update descriptors set layout
@@ -46,6 +45,46 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
     * x update the descriptor set
 
 # Log
+
+## 1/14/23 simplified initialization thought experiment
+![](Assets/Screenshots/init_render_deps.png)
+
+I've had a todo for a while to get rid of some of the boilerplate for initializing the render. I made this diagram to help. what it shows me is one approach for simplifying:
+1. mesh load amd buffers, texture loads, and 'global' buffer creation can happen first.
+2. updating the descriptor set needs some of these globals, so it can init second
+3. then the pipeline takes shaders and a descriptor set layout, so it happens after 
+
+conceptually this fits what I believe a lot of engines do which is:
+* load the resources needed for rendering. this includes shaders even though not needed until step 3 I suppose.
+* init the rendering part
+
+I'd like to thank the academy for the award for pointing out the obvious. 
+
+Now let's wrap this up:
+
+### 1. mesh, texture loads, and 'global' buffer creation
+For now I'll stick with the VulkTextureLoader and VulkUniformBuffer, those seem okay, maybe eventually a 'resource manager' class will be good.
+
+I'm not super happy with mesh loading and vert buffer handling. I feel like I keep going in circles on them. What is the problem I'm trying to solve:
+* init is basically fine. pipelines are relatively complicated, as are descriptor sets etc. defining this for a thing, like an 'actor' is something but also hides things
+* rendering is slightly tedious, for a given set of vertices you have a pipeline, descriptorset, verts, indices, and offset/size for rendering
+    * maybe the problem is multiple models that have the same vert/index buffers?
+
+### 2. updating the descriptor sets
+This part has gotten really tedious, especially the pool size tracking. I'm going to make a builder that tracks all the information around descriptors so we can simplify this.
+
+VulkPipelineBuilder is pretty solid, so that should be fine. 
+
+## 1/13/24 reflection
+
+To reflect:
+1. render skull and everything but the mirror as normal
+2. clear the stencil buffer
+3. render only the mirror to the stencil buffer
+4. render the reflected skull only where stencil is set
+5. render the mirror with transparency blending
+
+got sidetracked
 
 ## 1/11/24 stenciled outline of skull behind wall
 
@@ -55,6 +94,17 @@ here's a quick example of the stenciling showing the skull behind a wall a'la an
 1. render the skull with stencil write on passing pixels
 2. render the wall
 3. render the skull 1% larger with stencil set to accept only failing tests and with depth buffer turned off
+
+## 1/11/24
+fixed the bad looking skull! tl;dr: load/store ops matter! 
+
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+
+So having the depth/stencil attachment set to "don't care" seems to mean that, even if you call clear, the driver is free to optimize this away because you're clearing a buffer you said you don't care about. 
+
+Instead you have to set it to clear, just like depth:
+
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 
 ## 1/11/24 first stencil: outline
 The OutlineWorld sample works by rendering the model twice:
@@ -819,3 +869,5 @@ Glossary
 TODOS (Closed)
 * why does each actor's mesh need its own descriptorset again? because of how I'm doing instancing: the xform for each actor is offset from 0 from the SSBO xform buf. This could just be one big buffer that we use an instance offset for as well (and that's probably the 'right' way to do it), this is just how I did it
 * glslc includes must be a thing, I should look into that for some constants/lighting functionality
+* it feels like the descriptor set layout could inform the descriptor pool allocator and descriptor set updater...
+    * maybe we can have an 'addVertexBindings' for VulkPipelineBuilder that just does that boilerplate.

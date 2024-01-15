@@ -51,6 +51,7 @@
     } while (0)
 
 // keep in sync with Source\Shaders\Common\common.glsl
+// every binding needs to be globally unique across all shaders in a given pipeline
 enum VulkShaderBindings
 {
     VulkShaderBinding_XformsUBO = 0,
@@ -65,6 +66,32 @@ enum VulkShaderBindings
     VulkShaderBinding_NormalSampler = 9,
     VulkShaderBinding_ModelXform = 10,
     VulkShaderBinding_MaxBindingID,
+};
+
+enum VulkShaderUBOBindings
+{
+    VulkShaderUBOBinding_Xforms = VulkShaderBinding_XformsUBO,
+    VulkShaderUBOBinding_Lights = VulkShaderBinding_Lights,
+    VulkShaderUBOBinding_EyePos = VulkShaderBinding_EyePos,
+    VulkShaderUBOBinding_WavesXform = VulkShaderBinding_WavesXform,
+    VulkShaderUBOBinding_ModelXform = VulkShaderBinding_ModelXform,
+    VulkShaderUBOBinding_MaxBindingID,
+};
+
+enum VulkShaderSSBOBindings
+{
+    VulkShaderSSBOBinding_Actors = VulkShaderBinding_Actors,
+    VulkShaderSSBOBinding_Materials = VulkShaderBinding_Materials,
+    VulkShaderSSBOBinding_MaxBindingID,
+};
+
+enum VulkShaderTextureBindings
+{
+    VulkShaderTextureBinding_TextureSampler = VulkShaderBinding_TextureSampler,
+    VulkShaderTextureBinding_TextureSampler2 = VulkShaderBinding_TextureSampler2,
+    VulkShaderTextureBinding_TextureSampler3 = VulkShaderBinding_TextureSampler3,
+    VulkShaderTextureBinding_NormalSampler = VulkShaderBinding_NormalSampler,
+    VulkShaderTextureBinding_MaxBindingID,
 };
 
 // keep in sync with Source\Shaders\Common\common.glsl
