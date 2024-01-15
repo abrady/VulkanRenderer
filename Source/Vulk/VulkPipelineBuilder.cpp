@@ -54,7 +54,13 @@ VulkPipelineBuilder &VulkPipelineBuilder::addShaderStage(VkShaderStageFlagBits s
 {
     auto shaderCode = readFileIntoMem(path);
     VkShaderModule shaderModule = vk.createShaderModule(shaderCode);
+    addShaderStage(stage, shaderModule);
+    shaderModules.push_back(shaderModule); // this owns the shader module
+    return *this;
+}
 
+VulkPipelineBuilder &VulkPipelineBuilder::addShaderStage(VkShaderStageFlagBits stage, VkShaderModule shaderModule)
+{
     VkPipelineShaderStageCreateInfo shaderStageInfo{};
     shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStageInfo.stage = stage;
@@ -62,7 +68,6 @@ VulkPipelineBuilder &VulkPipelineBuilder::addShaderStage(VkShaderStageFlagBits s
     shaderStageInfo.pName = "main"; // entrypoint, by convention
 
     shaderStages.push_back(shaderStageInfo);
-    shaderModules.push_back(shaderModule);
     return *this;
 }
 

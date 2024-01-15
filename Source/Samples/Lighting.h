@@ -163,13 +163,13 @@ public:
             .build();
 
         VulkPipelineBuilder(*this)
-            .addVertexShaderStage("Source/Shaders/Vert/light.spv")
+            .addVertexShaderStageDeprecated("Source/Shaders/Vert/light.spv")
             .addVertexInputBindingDescription(0, sizeof(Vertex))
             .addVertexInputFieldVec3(0, Vertex::PosBinding, offsetof(Vertex, pos))
             .addVertexInputFieldVec3(0, Vertex::NormalBinding, offsetof(Vertex, normal))
             .addVertexInputFieldVec3(0, Vertex::TangentBinding, offsetof(Vertex, tangent))
             .addVertexInputFieldVec2(0, Vertex::TexCoordBinding, offsetof(Vertex, texCoord))
-            .addFragmentShaderStage("Source/Shaders/Frag/light.spv")
+            .addFragmentShaderStageDeprecated("Source/Shaders/Frag/light.spv")
             .build(actorsDescriptorSetLayout, &actorsPipelineLayout, &actorsGraphicsPipeline);
 
         VulkMesh sphere;

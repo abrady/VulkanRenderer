@@ -50,6 +50,9 @@
         }                                                                                                                                                        \
     } while (0)
 
+#define VULK_TEXTURE_DIR "Assets/Textures/"
+#define VULK_SHADERS_DIR "Source/Shaders/"
+
 // keep in sync with Source\Shaders\Common\common.glsl
 // every binding needs to be globally unique across all shaders in a given pipeline
 enum VulkShaderBindings

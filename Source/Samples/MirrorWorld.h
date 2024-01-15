@@ -11,6 +11,9 @@
 #include "Vulk/VulkDescriptorSetUpdater.h"
 #include "Vulk/VulkTextureView.h"
 
+#define ASSERT_KEY_NOT_SET(findable_container, key) assert((findable_container).find(key) == (findable_container).end())
+#define ASSERT_KEY_SET(findable_container, key) assert((findable_container).find(key) != (findable_container).end())
+
 struct MeshResources
 {
     Vulk &vk;
@@ -18,11 +21,110 @@ struct MeshResources
     VulkTextureView textureView;
     VulkTextureView normalView;
 
-    MeshResources(Vulk &vk, VulkMesh &&mesh, std::string const &texturePath, std::string const &normalPath)
+    MeshResources(Vulk &vk, VulkMesh &&mesh, std::string const &textureName, std::string const &normalName)
         : vk(vk),
           mesh(std::move(mesh)),
-          textureView(vk, texturePath),
-          normalView(vk, normalPath) {}
+          textureView(vk, VULK_TEXTURE_DIR + textureName),
+          normalView(vk, VULK_TEXTURE_DIR + normalName) {}
+};
+
+class Resources
+{
+    Vulk &vk;
+    std::unordered_map<std::string, std::unique_ptr<MeshResources>> meshResources;
+    std::unordered_map<std::string, VkShaderModule> vertShaders, fragShaders;
+    VkSampler textureSampler;
+
+    enum ShaderType
+    {
+        Vertex,
+        Fragment
+    };
+
+    VkShaderModule createShaderModule(ShaderType type, std::string const &name)
+    {
+        std::string subdir;
+        switch (type)
+        {
+        case Vertex:
+            subdir = "Vert";
+            break;
+        case Fragment:
+            subdir = "Frag";
+            break;
+        };
+
+        std::string path = VULK_SHADERS_DIR + subdir + "/" + name + ".spv";
+        auto shaderCode = readFileIntoMem(path);
+        VkShaderModule shaderModule = vk.createShaderModule(shaderCode);
+        return shaderModule;
+    }
+
+public:
+    Resources(Vulk &vk)
+        : vk(vk)
+    {
+        textureSampler = vk.createTextureSampler();
+    }
+
+    Resources &addMesh(std::string const &name, std::unique_ptr<MeshResources> &&mesh)
+    {
+        ASSERT_KEY_NOT_SET(meshResources, name);
+        meshResources[name] = std::move(mesh);
+        return *this;
+    }
+
+    Resources &loadVertexShader(std::string name)
+    {
+        ASSERT_KEY_NOT_SET(vertShaders, name);
+        VkShaderModule shaderModule = createShaderModule(Vertex, name);
+        vertShaders[name] = shaderModule;
+        return *this;
+    }
+
+    Resources &loadFragmentShader(std::string name)
+    {
+        ASSERT_KEY_NOT_SET(fragShaders, name);
+        VkShaderModule shaderModule = createShaderModule(Fragment, name);
+        fragShaders[name] = shaderModule;
+        return *this;
+    }
+
+    VkShaderModule getVertexShader(std::string const &name)
+    {
+        ASSERT_KEY_SET(vertShaders, name);
+        return vertShaders[name];
+    }
+
+    VkShaderModule getFragmentShader(std::string const &name)
+    {
+        ASSERT_KEY_SET(fragShaders, name);
+        return fragShaders[name];
+    }
+
+    MeshResources &getMesh(std::string const &name)
+    {
+        ASSERT_KEY_SET(meshResources, name);
+        return *meshResources[name];
+    }
+
+    VkSampler getTextureSampler()
+    {
+        return textureSampler;
+    }
+
+    ~Resources()
+    {
+        for (auto &pair : vertShaders)
+        {
+            vkDestroyShaderModule(vk.device, pair.second, nullptr);
+        }
+        for (auto &pair : fragShaders)
+        {
+            vkDestroyShaderModule(vk.device, pair.second, nullptr);
+        }
+        vkDestroySampler(vk.device, textureSampler, nullptr);
+    }
 };
 
 struct DescriptorSetInfo
@@ -223,31 +325,46 @@ public:
     };
     ModelUBOs modelUBOs;
 
-    VkSampler textureSampler;
-    std::unique_ptr<MeshResources> wallResources, skullResources;
+    Resources resources;
+    std::unique_ptr<Renderable> wallRenderable, skullRenderable, mirrorRenderable;
 
-    std::unique_ptr<Renderable> wallRenderable, skullRenderable;
+    void loadResources()
+    {
+        VulkMesh wallMesh;
+        makeQuad(6.0f, 6.0f, 1, wallMesh);
+        wallMesh.xform(glm::rotate(glm::mat4(1.0f), glm::radians(-45.0f), glm::vec3(1.0f, 0.0f, 0.f)));
+        wallMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -.5f, 0.0f)));
+
+        VulkMesh mirrorMesh;
+        makeQuad(2.0f, 1.0f, 1, mirrorMesh);
+        mirrorMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, .5f, 0.0f)));
+        mirrorMesh.xform(glm::rotate(glm::mat4(1.0f), glm::radians(-45.0f), glm::vec3(1.0f, 0.0f, 0.f)));
+        mirrorMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -.49f, 0.0f)));
+
+        auto wallResources = std::make_unique<MeshResources>(vk, std::move(wallMesh), "RedBrick/RedBrick.jpg", "RedBrick/RedBrickNormal.jpg");
+        auto skullResources = std::make_unique<MeshResources>(vk, VulkMesh::loadFromFile("Assets/Models/Skull/Skull.obj"), "Skull/DiffuseMap.png", "Skull/NormalMap.png");
+        auto mirrorResources = std::make_unique<MeshResources>(vk, std::move(mirrorMesh), "Brass-4K/4K-Brass_Base Color.jpg", "Brass-4K/4K-Brass_Normal.jpg");
+
+        resources.addMesh("wall", std::move(wallResources))
+            .addMesh("skull", std::move(skullResources))
+            .addMesh("mirror", std::move(mirrorResources))
+            .loadVertexShader("LitModel")
+            .loadFragmentShader("LitModel")
+            .loadFragmentShader("LitMirror");
+    }
 
 public:
     MirrorWorld(Vulk &vk) : vk(vk),
-                            modelUBOs(vk)
+                            modelUBOs(vk),
+                            resources(vk)
     {
         // load resources
-
-        VulkMesh wallMesh;
-        makeQuad(2.0f, 2.0f, 1, wallMesh);
-        wallMesh.xform(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.f)));
-
-        wallResources = std::make_unique<MeshResources>(vk, std::move(wallMesh), "Assets/Textures/RedBrick/RedBrick.jpg", "Assets/Textures/RedBrick/RedBrickNormal.jpg");
-        skullResources = std::make_unique<MeshResources>(vk, VulkMesh::loadFromFile("Assets/Models/Skull/Skull.obj"), "Assets/Models/Skull/DiffuseMap.png", "Assets/Models/Skull/NormalMap.png");
+        loadResources();
 
         // set up render globals
-
         modelUBOs.light.mappedUBO->pos = glm::vec3(2.0f, .5f, .5f);
         modelUBOs.light.mappedUBO->color = glm::vec3(.7f, .7f, .7f);
-        camera.lookAt(glm::vec3(0.0f, 0.f, 1.3f), glm::vec3(0.f, 0.f, 0.f));
-
-        textureSampler = vk.createTextureSampler();
+        camera.lookAt(glm::vec3(.9f, 1.f, 1.3f), glm::vec3(0.5f, 0.f, 0.f));
 
         // set up descriptors
 
@@ -257,29 +374,40 @@ public:
                                                  .addUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_Lights, modelUBOs.light.buf, modelUBOs.light.getSize());
 
         std::unique_ptr<DescriptorSetInfo> skullDS = DescriptorSetInfoBuilder(dsBuilder)
-                                                         .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, skullResources->textureView.textureImageView, textureSampler)
-                                                         .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, skullResources->normalView.textureImageView, textureSampler)
+                                                         .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("skull").textureView.textureImageView, resources.getTextureSampler())
+                                                         .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("skull").normalView.textureImageView, resources.getTextureSampler())
                                                          .build();
         std::unique_ptr<DescriptorSetInfo> wallDS = DescriptorSetInfoBuilder(dsBuilder)
-                                                        .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, wallResources->textureView.textureImageView, textureSampler)
-                                                        .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, wallResources->normalView.textureImageView, textureSampler)
+                                                        .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("wall").textureView.textureImageView, resources.getTextureSampler())
+                                                        .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("wall").normalView.textureImageView, resources.getTextureSampler())
                                                         .build();
+
+        std::unique_ptr<DescriptorSetInfo> mirrorDS = DescriptorSetInfoBuilder(dsBuilder)
+                                                          .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("mirror").textureView.textureImageView, resources.getTextureSampler())
+                                                          .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("mirror").normalView.textureImageView, resources.getTextureSampler())
+                                                          .build();
 
         // and finally the pipelines
         std::unique_ptr<VulkPipeline> skullPipeline = VulkPipelineBuilder(vk)
-                                                          .addVertexShaderStage("Source/Shaders/Vert/LitModel.spv")
-                                                          .addFragmentShaderStage("Source/Shaders/Frag/LitModel.spv")
+                                                          .addVertexShaderStage(resources.getVertexShader("LitModel"))
+                                                          .addFragmentShaderStage(resources.getFragmentShader("LitModel"))
                                                           .addVulkVertexInput(0)
                                                           .build(skullDS->descriptorSetLayout);
         std::unique_ptr<VulkPipeline> wallPipeline = VulkPipelineBuilder(vk)
-                                                         .addVertexShaderStage("Source/Shaders/Vert/LitModel.spv")
-                                                         .addFragmentShaderStage("Source/Shaders/Frag/LitModel.spv")
+                                                         .addVertexShaderStage(resources.getVertexShader("LitModel"))
+                                                         .addFragmentShaderStage(resources.getFragmentShader("LitModel"))
                                                          .addVulkVertexInput(0)
                                                          .build(wallDS->descriptorSetLayout);
+        std::unique_ptr<VulkPipeline> mirrorPipeline = VulkPipelineBuilder(vk)
+                                                           .addVertexShaderStage(resources.getVertexShader("LitModel"))
+                                                           .addFragmentShaderStage(resources.getFragmentShader("LitMirror"))
+                                                           .addVulkVertexInput(0)
+                                                           .build(mirrorDS->descriptorSetLayout);
 
         // pass ownership of everything off to the renderable.
-        wallRenderable = std::make_unique<Renderable>(vk, wallResources->mesh, std::move(wallDS), std::move(wallPipeline));
-        skullRenderable = std::make_unique<Renderable>(vk, skullResources->mesh, std::move(skullDS), std::move(skullPipeline));
+        wallRenderable = std::make_unique<Renderable>(vk, resources.getMesh("wall").mesh, std::move(wallDS), std::move(wallPipeline));
+        skullRenderable = std::make_unique<Renderable>(vk, resources.getMesh("skull").mesh, std::move(skullDS), std::move(skullPipeline));
+        mirrorRenderable = std::make_unique<Renderable>(vk, resources.getMesh("mirror").mesh, std::move(mirrorDS), std::move(mirrorPipeline));
     }
 
     void updateXformsUBO(XformsUBO &ubo, VkViewport const &viewport)
@@ -304,10 +432,8 @@ public:
 
         skullRenderable->render(commandBuffer, currentFrame, viewport, scissor);
         wallRenderable->render(commandBuffer, currentFrame, viewport, scissor);
+        mirrorRenderable->render(commandBuffer, currentFrame, viewport, scissor);
     }
 
-    ~MirrorWorld()
-    {
-        vkDestroySampler(vk.device, textureSampler, nullptr);
-    }
+    ~MirrorWorld() {}
 };

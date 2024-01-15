@@ -153,8 +153,8 @@ public:
                                   .build(MAX_FRAMES_IN_FLIGHT);
 
         VulkPipelineBuilder(vk)
-            .addVertexShaderStage("Source/Shaders/Vert/model.spv")
-            .addFragmentShaderStage("Source/Shaders/Frag/model.spv")
+            .addVertexShaderStageDeprecated("Source/Shaders/Vert/model.spv")
+            .addFragmentShaderStageDeprecated("Source/Shaders/Frag/model.spv")
             .addVulkVertexInput(0)
             .setPrimitiveTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
             .setCullMode(VK_CULL_MODE_BACK_BIT)
@@ -188,8 +188,8 @@ public:
                                   .build(MAX_FRAMES_IN_FLIGHT);
 
         VulkPipelineBuilder(vk)
-            .addVertexShaderStage("Source/Shaders/Vert/blending.spv")
-            .addFragmentShaderStage("Source/Shaders/Frag/blending.spv")
+            .addVertexShaderStageDeprecated("Source/Shaders/Vert/blending.spv")
+            .addFragmentShaderStageDeprecated("Source/Shaders/Frag/blending.spv")
             .addVulkVertexInput(0)
             .setPrimitiveTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
             .setCullMode(VK_CULL_MODE_BACK_BIT)

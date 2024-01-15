@@ -197,7 +197,8 @@ add_executable (VulkanRenderer "Source/main.cpp" ${VULKAN_RENDERER_SOURCES})
 if(MSVC)
   # /analyze - /analyze:warninglevel 4
   # /fsanitize=address /fsanitize=fuzzer
-  target_compile_options(VulkanRenderer PRIVATE /W4 /WX)
+  # /sdl - Enables recommended Security Development Lifecycle (SDL) checks
+  target_compile_options(VulkanRenderer PRIVATE /W4 /WX /sdl)
 else()
   target_compile_options(VulkanRenderer PRIVATE -Wall -Wextra -pedantic -Werror)
 endif()

@@ -40,22 +40,39 @@ class VulkPipelineBuilder
     VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     VulkPipelineBuilder &addShaderStage(VkShaderStageFlagBits stage, char const *path);
+    VulkPipelineBuilder &addShaderStage(VkShaderStageFlagBits stage, VkShaderModule shaderModule);
     VulkPipelineBuilder &addVertexInputField(uint32_t binding, uint32_t location, uint32_t offset, VkFormat format);
 
 public:
     VulkPipelineBuilder(Vulk &vk);
 
-    VulkPipelineBuilder &addVertexShaderStage(char const *path)
+    VulkPipelineBuilder &addVertexShaderStage(VkShaderModule shaderModule)
+    {
+        return addShaderStage(VK_SHADER_STAGE_VERTEX_BIT, shaderModule);
+    }
+
+    VulkPipelineBuilder &addFragmentShaderStage(VkShaderModule shaderModule)
+    {
+        return addShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, shaderModule);
+    }
+
+    VulkPipelineBuilder &addGeometryShaderStage(VkShaderModule shaderModule)
+    {
+        return addShaderStage(VK_SHADER_STAGE_GEOMETRY_BIT, shaderModule);
+    }
+
+    // DEPRECATED, switching towards shader resources being owned by a resource manager.
+    VulkPipelineBuilder &addVertexShaderStageDeprecated(char const *path)
     {
         return addShaderStage(VK_SHADER_STAGE_VERTEX_BIT, path);
     }
 
-    VulkPipelineBuilder &addFragmentShaderStage(char const *path)
+    VulkPipelineBuilder &addFragmentShaderStageDeprecated(char const *path)
     {
         return addShaderStage(VK_SHADER_STAGE_FRAGMENT_BIT, path);
     }
 
-    VulkPipelineBuilder &addGeometryShaderStage(char const *path)
+    VulkPipelineBuilder &addGeometryShaderStageDeprecated(char const *path)
     {
         return addShaderStage(VK_SHADER_STAGE_GEOMETRY_BIT, path);
     }

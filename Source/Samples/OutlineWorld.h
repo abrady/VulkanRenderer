@@ -180,8 +180,8 @@ public:
         // pass 1: draw the model with stencil buffer enabled, and write to the stencil buffer
         // pass 2: draw the model again scaled up slightly, but only where the stencil buffer is not set and with the depth test write disabled
         VulkPipelineBuilder(vk)
-            .addVertexShaderStage("Source/Shaders/Vert/LitModel.spv")
-            .addFragmentShaderStage("Source/Shaders/Frag/LitModel.spv")
+            .addVertexShaderStageDeprecated("Source/Shaders/Vert/LitModel.spv")
+            .addFragmentShaderStageDeprecated("Source/Shaders/Frag/LitModel.spv")
             .addVulkVertexInput(0)
             .setStencilTestEnabled(true)
             .setStencilFrontFailOp(VK_STENCIL_OP_KEEP)      // keep the stencil buffer unchanged
@@ -224,8 +224,8 @@ public:
                                    .build(MAX_FRAMES_IN_FLIGHT);
 
         VulkPipelineBuilder(vk)
-            .addVertexShaderStage("Source/Shaders/Vert/LitModel.spv")
-            .addFragmentShaderStage("Source/Shaders/Frag/LitModel.spv")
+            .addVertexShaderStageDeprecated("Source/Shaders/Vert/LitModel.spv")
+            .addFragmentShaderStageDeprecated("Source/Shaders/Frag/LitModel.spv")
             .addVulkVertexInput(0)
             .setDepthTestEnabled(true)
             .setDepthWriteEnabled(true)
@@ -251,8 +251,8 @@ public:
                                           .build();
 
         VulkPipelineBuilder(vk)
-            .addVertexShaderStage("Source/Shaders/Vert/Outline.spv")
-            .addFragmentShaderStage("Source/Shaders/Frag/Outline.spv")
+            .addVertexShaderStageDeprecated("Source/Shaders/Vert/Outline.spv")
+            .addFragmentShaderStageDeprecated("Source/Shaders/Frag/Outline.spv")
             .addVulkVertexInput(0)
             .setDepthTestEnabled(false)
             .setDepthWriteEnabled(false)

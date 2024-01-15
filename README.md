@@ -46,6 +46,18 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 1/14/24 reflection
+
+To reflect:
+1. render skull and everything but the mirror as normal
+2. clear the stencil buffer
+3. render only the mirror to the stencil buffer
+4. render the reflected skull only where stencil is set
+5. render the mirror with transparency blending
+
+got sidetracked
+
+
 ## 1/14/23 simplified initialization thought experiment
 ![](Assets/Screenshots/init_render_deps.png)
 
@@ -74,17 +86,6 @@ I'm not super happy with mesh loading and vert buffer handling. I feel like I ke
 This part has gotten really tedious, especially the pool size tracking. I'm going to make a builder that tracks all the information around descriptors so we can simplify this.
 
 VulkPipelineBuilder is pretty solid, so that should be fine. 
-
-## 1/13/24 reflection
-
-To reflect:
-1. render skull and everything but the mirror as normal
-2. clear the stencil buffer
-3. render only the mirror to the stencil buffer
-4. render the reflected skull only where stencil is set
-5. render the mirror with transparency blending
-
-got sidetracked
 
 ## 1/11/24 stenciled outline of skull behind wall
 
