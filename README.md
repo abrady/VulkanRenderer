@@ -38,6 +38,7 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 # TODOs
 * document some of the annoying things I'm finally getting around to coding around.
 * VulkPipelineBuilder should use a set for stages and error if they already exist...
+* resources next steps: generate a manifest during the build and load that.
 
 * need per-actor materials:
     * x update descriptors set layout
@@ -46,7 +47,22 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
-## 1/14/24 reflection
+
+
+## 1/27/24 natvis pretty variable debugging
+getting nans in my reflected mesh. glm vecs are a pain in the ass to debug because they have union'd x,y,z with two other things, can I visualize this better?
+
+Hey! MSVC support .natvis files, and someone put one up for glm already! how do I add them?
+
+  set(MY_PROJECT_NATVIS_FILES "${CMAKE_SOURCE_DIR}/Source/Tools/MSVC/glm.natvis")
+  target_sources(VulkanRenderer PRIVATE ${MY_PROJECT_NATVIS_FILES})
+
+we're rolling, nice!
+![](Assets/Screenshots/glm_natvis.png)
+
+
+## 1/24/24 reflection
+oof, it's been a while. 
 
 To reflect:
 1. render skull and everything but the mirror as normal
@@ -55,7 +71,39 @@ To reflect:
 4. render the reflected skull only where stencil is set
 5. render the mirror with transparency blending
 
-got sidetracked
+Let's see what sort of mess I left for myself with that last refactor:
+1. the renderer has three main parts:
+    1. resource loading: shaders, lights, cameras, materials, textures, meshes
+    2. render init: 
+        1. create global buffers (mesh, texture views/UBOs/SBOs), 
+        2. create the descriptor set layout etc.
+        3. bind the UBOs/SBOs and texture views to the descriptor set
+        3. create the pipeline and vert/index buffers
+    3. actual rendering: bind pipeline, descriptor sets, index/vert 
+
+
+### Reflection pondering:
+Reflecting across the x axis at origin is just -x..., e.g. if I have P = (x,y), then P', the reflected point = (-x,y)
+
+If I think of a plane as having a normal N, then reflection seems to be moving a point in the direction of the plane twice the distance it is from the plane?
+* N = (1,0)
+* P = (5,2)
+* P' = (-5,2), or = P - 10*N  // notice we have 10 which is twice 5: the first moves it to origin, the second to the reflection
+
+More generally, let d be the distance from the plane, then if we have a function 'dist(N,P)' it will return d, the scalar distance from the plane in the direction opposite the normal.
+* dist(N,P) = N.P
+    * assuming the plane passes through origin.
+    * note: if this is negative the point is behind the plane.
+
+We can generalize to any plane with normal N and a point on the plane D:
+* dist(N,D,P) = N.(P-D)
+    * assuming N is normalized, which it should be
+
+So reflecting a point across an arbitrary plain is really straightforward:
+* Given: 
+    * a plane (a point D on the plain and a normal N) and a point P
+* you can reflect the point across that plane by moving it twice the distance in the direction of the plane:
+    * P' = P - 2*N.(P-D)
 
 
 ## 1/14/23 simplified initialization thought experiment

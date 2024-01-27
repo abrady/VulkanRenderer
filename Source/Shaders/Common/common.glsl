@@ -11,6 +11,7 @@ const int VulkShaderBinding_TextureSampler3 = 7;
 const int VulkShaderBinding_WavesXform = 8;
 const int VulkShaderBinding_NormalSampler = 9;
 const int VulkShaderBinding_ModelXform = 10;
+const int VulkShaderBinding_MirrorPlaneUBO = 11;
 
 struct GlobalXform {
     mat4 world;

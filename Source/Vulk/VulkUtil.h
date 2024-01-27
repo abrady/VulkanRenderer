@@ -50,6 +50,9 @@
         }                                                                                                                                                        \
     } while (0)
 
+#define ASSERT_KEY_NOT_SET(findable_container, key) assert((findable_container).find(key) == (findable_container).end())
+#define ASSERT_KEY_SET(findable_container, key) assert((findable_container).find(key) != (findable_container).end())
+
 #define VULK_TEXTURE_DIR "Assets/Textures/"
 #define VULK_SHADERS_DIR "Source/Shaders/"
 
@@ -68,6 +71,7 @@ enum VulkShaderBindings
     VulkShaderBinding_WavesXform = 8,
     VulkShaderBinding_NormalSampler = 9,
     VulkShaderBinding_ModelXform = 10,
+    VulkShaderBinding_MirrorPlaneUBO = 11,
     VulkShaderBinding_MaxBindingID,
 };
 
@@ -78,6 +82,7 @@ enum VulkShaderUBOBindings
     VulkShaderUBOBinding_EyePos = VulkShaderBinding_EyePos,
     VulkShaderUBOBinding_WavesXform = VulkShaderBinding_WavesXform,
     VulkShaderUBOBinding_ModelXform = VulkShaderBinding_ModelXform,
+    VulkShaderUBOBinding_MirrorPlaneUBO = VulkShaderBinding_MirrorPlaneUBO,
     VulkShaderUBOBinding_MaxBindingID,
 };
 
@@ -149,3 +154,5 @@ SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurface
 QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
 void loadModel(char const *model_path, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices);
 std::vector<char> readFileIntoMem(const std::string &filename);
+
+#include <glm/glm.hpp>

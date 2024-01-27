@@ -195,12 +195,16 @@ set(VULKAN_RENDERER_SOURCES
 
 add_executable (VulkanRenderer "Source/main.cpp" ${VULKAN_RENDERER_SOURCES})
 if(MSVC)
+  set(MY_PROJECT_NATVIS_FILES "${CMAKE_SOURCE_DIR}/Source/Tools/MSVC/glm.natvis")
+  target_sources(VulkanRenderer PRIVATE ${MY_PROJECT_NATVIS_FILES})
   # /analyze - /analyze:warninglevel 4
   # /fsanitize=address /fsanitize=fuzzer
   # /sdl - Enables recommended Security Development Lifecycle (SDL) checks
   target_compile_options(VulkanRenderer PRIVATE /W4 /WX /sdl)
+  add_compile_options(/fsanitize=address)
 else()
   target_compile_options(VulkanRenderer PRIVATE -Wall -Wextra -pedantic -Werror)
+  add_compile_options(-sanitize=address)
 endif()
 
 add_dependencies(VulkanRenderer compile_shaders)

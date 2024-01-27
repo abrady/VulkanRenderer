@@ -11,9 +11,6 @@
 #include "Vulk/VulkDescriptorSetUpdater.h"
 #include "Vulk/VulkTextureView.h"
 
-#define ASSERT_KEY_NOT_SET(findable_container, key) assert((findable_container).find(key) == (findable_container).end())
-#define ASSERT_KEY_SET(findable_container, key) assert((findable_container).find(key) != (findable_container).end())
-
 struct MeshResources
 {
     Vulk &vk;
@@ -92,12 +89,20 @@ public:
 
     VkShaderModule getVertexShader(std::string const &name)
     {
+        if (vertShaders.find(name) == vertShaders.end())
+        {
+            loadVertexShader(name);
+        }
         ASSERT_KEY_SET(vertShaders, name);
         return vertShaders[name];
     }
 
     VkShaderModule getFragmentShader(std::string const &name)
     {
+        if (fragShaders.find(name) == fragShaders.end())
+        {
+            loadFragmentShader(name);
+        }
         ASSERT_KEY_SET(fragShaders, name);
         return fragShaders[name];
     }
@@ -157,8 +162,13 @@ class DescriptorSetInfoBuilder
         VkBuffer buf;
         VkDeviceSize range;
     };
-    std::unordered_map<VulkShaderUBOBindings, BufSetUpdaterInfo> uniformSetInfos;
-    std::unordered_map<VulkShaderSSBOBindings, BufSetUpdaterInfo> ssboSetInfos;
+
+    struct PerFrameInfo
+    {
+        std::unordered_map<VulkShaderUBOBindings, BufSetUpdaterInfo> uniformSetInfos;
+        std::unordered_map<VulkShaderSSBOBindings, BufSetUpdaterInfo> ssboSetInfos;
+    };
+    std::array<PerFrameInfo, MAX_FRAMES_IN_FLIGHT> perFrameInfos;
 
     struct SamplerSetUpdaterInfo
     {
@@ -170,19 +180,15 @@ class DescriptorSetInfoBuilder
 public:
     DescriptorSetInfoBuilder(Vulk &vk) : vk(vk), layoutBuilder(vk), poolBuilder(vk) {}
 
-    DescriptorSetInfoBuilder &addUniformBuffer(VkShaderStageFlags stageFlags, VulkShaderUBOBindings bindingID, VkBuffer buf, VkDeviceSize range)
+    template <typename T>
+    DescriptorSetInfoBuilder &addUniformBuffers(std::array<VulkUniformBuffer<T>, MAX_FRAMES_IN_FLIGHT> &uniformBuffers, VkShaderStageFlags stageFlags, VulkShaderUBOBindings bindingID)
     {
         layoutBuilder.addUniformBuffer(bindingID, stageFlags);
         poolBuilder.addUniformBufferCount(MAX_FRAMES_IN_FLIGHT);
-        uniformSetInfos[bindingID] = {buf, range};
-        return *this;
-    }
-
-    DescriptorSetInfoBuilder &addStorageBuffer(VkShaderStageFlags stageFlags, VulkShaderSSBOBindings bindingID, VkBuffer buf, VkDeviceSize range)
-    {
-        layoutBuilder.addStorageBuffer(bindingID, stageFlags);
-        poolBuilder.addStorageBufferCount(MAX_FRAMES_IN_FLIGHT);
-        ssboSetInfos[bindingID] = {buf, range};
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        {
+            perFrameInfos[i].uniformSetInfos[bindingID] = {uniformBuffers[i].buf, sizeof(T)};
+        }
         return *this;
     }
 
@@ -204,11 +210,11 @@ public:
             descriptorSets[i] = vk.createDescriptorSet(descriptorSetLayout, pool);
             VulkDescriptorSetUpdater updater = VulkDescriptorSetUpdater(descriptorSets[i]);
 
-            for (auto &pair : uniformSetInfos)
+            for (auto &pair : perFrameInfos[i].uniformSetInfos)
             {
                 updater.addUniformBuffer(pair.second.buf, pair.second.range, pair.first);
             }
-            for (auto &pair : ssboSetInfos)
+            for (auto &pair : perFrameInfos[i].ssboSetInfos)
             {
                 updater.addStorageBuffer(pair.second.buf, pair.second.range, pair.first);
             }
@@ -223,11 +229,31 @@ public:
     }
 };
 
-class Renderable
+class RenderState
 {
     std::unique_ptr<DescriptorSetInfo> dsInfo;
     std::unique_ptr<VulkPipeline> plInfo;
     Vulk &vk;
+
+public:
+    RenderState(Vulk &vk, std::unique_ptr<DescriptorSetInfo> &&dsInfo, std::unique_ptr<VulkPipeline> &&plInfo)
+        : vk(vk),
+          dsInfo(std::move(dsInfo)),
+          plInfo(std::move(plInfo)) {}
+
+    void setRenderState(VkCommandBuffer commandBuffer, uint32_t currentFrame, VkViewport const &viewport, VkRect2D const &scissor)
+    {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, plInfo->pipeline);
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, plInfo->pipelineLayout, 0, 1, &dsInfo->descriptorSets[currentFrame], 0, nullptr);
+    }
+};
+
+class MeshRenderable
+{
+    Vulk &vk;
+    RenderState renderState;
     uint32_t numIndices;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
@@ -236,12 +262,10 @@ class Renderable
     VkDeviceMemory indexBufferMemory;
 
 public:
-    Renderable(Vulk &vk, VulkMesh const &mesh, std::unique_ptr<DescriptorSetInfo> &&dsInfo, std::unique_ptr<VulkPipeline> &&plInfo)
+    MeshRenderable(Vulk &vk, VulkMesh const &mesh, std::unique_ptr<DescriptorSetInfo> &&dsInfo, std::unique_ptr<VulkPipeline> &&plInfo)
         : vk(vk),
-          numIndices((uint32_t)mesh.indices.size()),
-          dsInfo(std::move(dsInfo)),
-          plInfo(std::move(plInfo))
-
+          renderState(vk, std::move(dsInfo), std::move(plInfo)),
+          numIndices((uint32_t)mesh.indices.size())
     {
         auto &vertices = mesh.vertices;
         auto &indices = mesh.indices;
@@ -259,18 +283,19 @@ public:
 
     void render(VkCommandBuffer commandBuffer, uint32_t currentFrame, VkViewport const &viewport, VkRect2D const &scissor)
     {
-        VkDeviceSize offsets[] = {0};
+        renderState.setRenderState(commandBuffer, currentFrame, viewport, scissor);
+        bindAndDrawMesh(commandBuffer);
+    }
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, plInfo->pipeline);
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, plInfo->pipelineLayout, 0, 1, &dsInfo->descriptorSets[currentFrame], 0, nullptr);
+    void bindAndDrawMesh(VkCommandBuffer commandBuffer)
+    {
+        VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
     }
 
-    ~Renderable()
+    ~MeshRenderable()
     {
         vkDestroyBuffer(vk.device, vertexBuffer, nullptr);
         vkFreeMemory(vk.device, vertexBufferMemory, nullptr);
@@ -292,86 +317,99 @@ public:
         alignas(16) glm::mat4 proj;
     };
 
-    struct ModelUBOs
+    template <typename T>
+    class FrameUBOs
     {
         Vulk &vk;
-        std::array<VulkUniformBuffer<XformsUBO>, MAX_FRAMES_IN_FLIGHT> xforms;
-        std::array<VulkUniformBuffer<glm::vec3>, MAX_FRAMES_IN_FLIGHT> eyePos;
-        VulkUniformBuffer<VulkLight> light;
-        ModelUBOs(Vulk &vk) : vk(vk)
+        std::array<VulkUniformBuffer<T>, MAX_FRAMES_IN_FLIGHT> ubos;
+
+    public:
+        explicit FrameUBOs(Vulk &vk) : vk(vk)
         {
-            for (auto &ubo : xforms)
+            for (auto &ubo : ubos)
             {
                 ubo.init(vk);
             }
-            for (auto &ubo : eyePos)
-            {
-                ubo.init(vk);
-            }
-            light.init(vk);
         }
-        ~ModelUBOs()
+        ~FrameUBOs()
         {
-            for (auto &ubo : xforms)
+            for (auto &ubo : ubos)
             {
                 ubo.cleanup(vk);
             }
-            for (auto &ubo : eyePos)
-            {
-                ubo.cleanup(vk);
-            }
-            light.cleanup(vk);
         }
+        std::array<VulkUniformBuffer<T>, MAX_FRAMES_IN_FLIGHT> &getUBOs()
+        {
+            return ubos;
+        }
+        std::array<VulkUniformBuffer<T>, MAX_FRAMES_IN_FLIGHT>::iterator begin()
+        {
+            return ubos.begin();
+        }
+        std::array<VulkUniformBuffer<T>, MAX_FRAMES_IN_FLIGHT>::iterator end()
+        {
+            return ubos.end();
+        }
+        T *operator[](uint32_t frame)
+        {
+            return ubos[frame].mappedUBO;
+        }
+    };
+
+    struct ModelUBOs
+    {
+        FrameUBOs<XformsUBO> xforms;
+        FrameUBOs<glm::vec3> eyePos;
+        FrameUBOs<VulkLight> lights;
+        ModelUBOs(Vulk &vk) : xforms(vk), eyePos(vk), lights(vk) {}
     };
     ModelUBOs modelUBOs;
 
-    Resources resources;
-    std::unique_ptr<Renderable> wallRenderable, skullRenderable, mirrorRenderable;
-
-    void loadResources()
+    struct MirrorPlane
     {
-        VulkMesh wallMesh;
-        makeQuad(6.0f, 6.0f, 1, wallMesh);
-        wallMesh.xform(glm::rotate(glm::mat4(1.0f), glm::radians(-45.0f), glm::vec3(1.0f, 0.0f, 0.f)));
-        wallMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -.5f, 0.0f)));
+        glm::vec4 normal;
+        glm::vec4 point;
+    };
+    FrameUBOs<MirrorPlane> mirroredPlanes;
 
-        VulkMesh mirrorMesh;
-        makeQuad(2.0f, 1.0f, 1, mirrorMesh);
-        mirrorMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, .5f, 0.0f)));
-        mirrorMesh.xform(glm::rotate(glm::mat4(1.0f), glm::radians(-45.0f), glm::vec3(1.0f, 0.0f, 0.f)));
-        mirrorMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -.49f, 0.0f)));
-
-        auto wallResources = std::make_unique<MeshResources>(vk, std::move(wallMesh), "RedBrick/RedBrick.jpg", "RedBrick/RedBrickNormal.jpg");
-        auto skullResources = std::make_unique<MeshResources>(vk, VulkMesh::loadFromFile("Assets/Models/Skull/Skull.obj"), "Skull/DiffuseMap.png", "Skull/NormalMap.png");
-        auto mirrorResources = std::make_unique<MeshResources>(vk, std::move(mirrorMesh), "Brass-4K/4K-Brass_Base Color.jpg", "Brass-4K/4K-Brass_Normal.jpg");
-
-        resources.addMesh("wall", std::move(wallResources))
-            .addMesh("skull", std::move(skullResources))
-            .addMesh("mirror", std::move(mirrorResources))
-            .loadVertexShader("LitModel")
-            .loadFragmentShader("LitModel")
-            .loadFragmentShader("LitMirror");
-    }
+    Resources resources;
+    std::unique_ptr<RenderState> mirrorWorldRenderState, mirrorStencilRenderState;
+    std::unique_ptr<MeshRenderable> wallRenderable, skullRenderable, mirrorRenderable;
 
 public:
     MirrorWorld(Vulk &vk) : vk(vk),
                             modelUBOs(vk),
-                            resources(vk)
+                            resources(vk),
+                            mirroredPlanes(vk)
     {
         // load resources
         loadResources();
 
         // set up render globals
-        modelUBOs.light.mappedUBO->pos = glm::vec3(2.0f, .5f, .5f);
-        modelUBOs.light.mappedUBO->color = glm::vec3(.7f, .7f, .7f);
+        for (auto &light : modelUBOs.lights)
+        {
+            light.mappedUBO->pos = glm::vec3(0.0f, 0.0f, 0.0f);
+            light.mappedUBO->color = glm::vec3(1.0f, 1.0f, 1.0f);
+        }
         camera.lookAt(glm::vec3(.9f, 1.f, 1.3f), glm::vec3(0.5f, 0.f, 0.f));
 
-        // set up descriptors
+        // set up mirror plane
+        VulkMesh mirrorMesh = resources.getMesh("mirror").mesh;
+        glm::vec3 p0 = mirrorMesh.vertices[mirrorMesh.indices[0]].pos;
+        glm::vec3 p1 = mirrorMesh.vertices[mirrorMesh.indices[1]].pos;
+        glm::vec3 p2 = mirrorMesh.vertices[mirrorMesh.indices[2]].pos;
+        glm::vec3 normal = glm::normalize(glm::cross(p1 - p0, p2 - p0));
+        for (auto &plane : mirroredPlanes)
+        {
+            plane.mappedUBO->normal = glm::vec4(normal, 0.0f);
+            plane.mappedUBO->point = glm::vec4(p0, 1.0f);
+        }
 
+        // set up descriptors
         DescriptorSetInfoBuilder dsBuilder = DescriptorSetInfoBuilder(vk)
-                                                 .addUniformBuffer(VK_SHADER_STAGE_VERTEX_BIT, VulkShaderUBOBinding_Xforms, modelUBOs.xforms[0].buf, modelUBOs.xforms[0].getSize())
-                                                 .addUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_EyePos, modelUBOs.eyePos[0].buf, modelUBOs.eyePos[0].getSize())
-                                                 .addUniformBuffer(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_Lights, modelUBOs.light.buf, modelUBOs.light.getSize());
+                                                 .addUniformBuffers(modelUBOs.xforms.getUBOs(), VK_SHADER_STAGE_VERTEX_BIT, VulkShaderUBOBinding_Xforms)
+                                                 .addUniformBuffers(modelUBOs.eyePos.getUBOs(), VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_EyePos)
+                                                 .addUniformBuffers(modelUBOs.lights.getUBOs(), VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_Lights);
 
         std::unique_ptr<DescriptorSetInfo> skullDS = DescriptorSetInfoBuilder(dsBuilder)
                                                          .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("skull").textureView.textureImageView, resources.getTextureSampler())
@@ -386,6 +424,17 @@ public:
                                                           .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("mirror").textureView.textureImageView, resources.getTextureSampler())
                                                           .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("mirror").normalView.textureImageView, resources.getTextureSampler())
                                                           .build();
+
+        std::unique_ptr<DescriptorSetInfo> mirrorStencilDS = DescriptorSetInfoBuilder(dsBuilder)
+                                                                 .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("mirror").textureView.textureImageView, resources.getTextureSampler())
+                                                                 .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("mirror").normalView.textureImageView, resources.getTextureSampler())
+                                                                 .build();
+
+        std::unique_ptr<DescriptorSetInfo> mirrorWorldRenderStateDS = DescriptorSetInfoBuilder(dsBuilder)
+                                                                          .addUniformBuffers(mirroredPlanes.getUBOs(), VK_SHADER_STAGE_VERTEX_BIT, VulkShaderUBOBinding_MirrorPlaneUBO)
+                                                                          .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("skull").textureView.textureImageView, resources.getTextureSampler())
+                                                                          .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("skull").normalView.textureImageView, resources.getTextureSampler())
+                                                                          .build();
 
         // and finally the pipelines
         std::unique_ptr<VulkPipeline> skullPipeline = VulkPipelineBuilder(vk)
@@ -404,10 +453,36 @@ public:
                                                            .addVulkVertexInput(0)
                                                            .build(mirrorDS->descriptorSetLayout);
 
-        // pass ownership of everything off to the renderable.
-        wallRenderable = std::make_unique<Renderable>(vk, resources.getMesh("wall").mesh, std::move(wallDS), std::move(wallPipeline));
-        skullRenderable = std::make_unique<Renderable>(vk, resources.getMesh("skull").mesh, std::move(skullDS), std::move(skullPipeline));
-        mirrorRenderable = std::make_unique<Renderable>(vk, resources.getMesh("mirror").mesh, std::move(mirrorDS), std::move(mirrorPipeline));
+        // TODO: I should make a special pipeline for the stencil that just looks at verts, but this is fine for now.
+        std::unique_ptr<VulkPipeline> mirrorStencilPipeline = VulkPipelineBuilder(vk)
+                                                                  .addVertexShaderStage(resources.getVertexShader("LitModel"))
+                                                                  .addFragmentShaderStage(resources.getFragmentShader("LitMirror"))
+                                                                  .addVulkVertexInput(0)
+                                                                  .setBlendingEnabled(true)                       // we don't want to write to the color buffer, just the stencil buffer
+                                                                  .setStencilTestEnabled(true)                    // enable stencil testing
+                                                                  .setStencilFrontFailOp(VK_STENCIL_OP_KEEP)      // keep the stencil buffer unchanged on fail
+                                                                  .setFrontStencilPassOp(VK_STENCIL_OP_REPLACE)   // replace the stencil buffer with the reference value
+                                                                  .setFrontStencilCompareOp(VK_COMPARE_OP_ALWAYS) // always pass the stencil test for our first pass
+                                                                  .setFrontStencilCompareMask(0xFF)               // compare against all bits
+                                                                  .setFrontStencilWriteMask(0xFF)                 // allow write to all bits
+                                                                  .setFrontStencilReference(1)                    // value to write to the stencil buffer
+                                                                  .build(mirrorStencilDS->descriptorSetLayout);
+
+        // triangle winding order is backwards for the mirror, so I need to flip the cull mode.
+        std::unique_ptr<VulkPipeline> mirroredWorldPipeline = VulkPipelineBuilder(vk)
+                                                                  .addVertexShaderStage(resources.getVertexShader("LitMirroredModel"))
+                                                                  .addFragmentShaderStage(resources.getFragmentShader("LitModel"))
+                                                                  .addVulkVertexInput(0)
+                                                                  .setCullMode(VK_CULL_MODE_FRONT_BIT)
+                                                                  .build(mirrorWorldRenderStateDS->descriptorSetLayout);
+
+        // pass ownership of everything off to the renderables.
+        wallRenderable = std::make_unique<MeshRenderable>(vk, resources.getMesh("wall").mesh, std::move(wallDS), std::move(wallPipeline));
+        skullRenderable = std::make_unique<MeshRenderable>(vk, resources.getMesh("skull").mesh, std::move(skullDS), std::move(skullPipeline));
+        mirrorRenderable = std::make_unique<MeshRenderable>(vk, resources.getMesh("mirror").mesh, std::move(mirrorDS), std::move(mirrorPipeline));
+
+        mirrorStencilRenderState = std::make_unique<RenderState>(vk, std::move(mirrorStencilDS), std::move(mirrorStencilPipeline));
+        mirrorWorldRenderState = std::make_unique<RenderState>(vk, std::move(mirrorWorldRenderStateDS), std::move(mirroredWorldPipeline));
     }
 
     void updateXformsUBO(XformsUBO &ubo, VkViewport const &viewport)
@@ -427,13 +502,45 @@ public:
 
     void render(VkCommandBuffer commandBuffer, uint32_t currentFrame, VkViewport const &viewport, VkRect2D const &scissor)
     {
-        updateXformsUBO(*modelUBOs.xforms[currentFrame].mappedUBO, viewport);
-        *modelUBOs.eyePos[currentFrame].mappedUBO = camera.eye;
+        updateXformsUBO(*modelUBOs.xforms[currentFrame], viewport);
+        *modelUBOs.eyePos[currentFrame] = camera.eye;
 
         skullRenderable->render(commandBuffer, currentFrame, viewport, scissor);
-        wallRenderable->render(commandBuffer, currentFrame, viewport, scissor);
-        mirrorRenderable->render(commandBuffer, currentFrame, viewport, scissor);
+        // wallRenderable->render(commandBuffer, currentFrame, viewport, scissor);
+
+        // first render the mirror stencil so we know which pixels to keep
+        mirrorStencilRenderState->setRenderState(commandBuffer, currentFrame, viewport, scissor);
+
+        // now render the mirrored world
+        mirrorWorldRenderState->setRenderState(commandBuffer, currentFrame, viewport, scissor);
+        skullRenderable->bindAndDrawMesh(commandBuffer);
+
+        // finally render the mirror
+        // mirrorRenderable->render(commandBuffer, currentFrame, viewport, scissor);
     }
 
     ~MirrorWorld() {}
+
+private:
+    void loadResources()
+    {
+        VulkMesh wallMesh;
+        makeQuad(6.0f, 6.0f, 1, wallMesh);
+        wallMesh.xform(glm::rotate(glm::mat4(1.0f), glm::radians(-45.0f), glm::vec3(1.0f, 0.0f, 0.f)));
+        wallMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -.5f, 0.0f)));
+
+        VulkMesh mirrorMesh;
+        makeQuad(2.0f, 1.0f, 1, mirrorMesh);
+        mirrorMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, .5f, 0.0f)));
+        mirrorMesh.xform(glm::rotate(glm::mat4(1.0f), glm::radians(-45.0f), glm::vec3(1.0f, 0.0f, 0.f)));
+        mirrorMesh.xform(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -.49f, 0.0f)));
+
+        auto wallResources = std::make_unique<MeshResources>(vk, std::move(wallMesh), "RedBrick/RedBrick.jpg", "RedBrick/RedBrickNormal.jpg");
+        auto skullResources = std::make_unique<MeshResources>(vk, VulkMesh::loadFromFile("Assets/Models/Skull/Skull.obj"), "Skull/DiffuseMap.png", "Skull/NormalMap.png");
+        auto mirrorResources = std::make_unique<MeshResources>(vk, std::move(mirrorMesh), "Brass-4K/4K-Brass_Base Color.jpg", "Brass-4K/4K-Brass_Normal.jpg");
+
+        resources.addMesh("wall", std::move(wallResources))
+            .addMesh("skull", std::move(skullResources))
+            .addMesh("mirror", std::move(mirrorResources));
+    }
 };
