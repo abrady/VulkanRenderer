@@ -10,6 +10,8 @@
 #include "Vulk/VulkStorageBuffer.h"
 #include "Vulk/VulkDescriptorSetUpdater.h"
 #include "Vulk/VulkTextureView.h"
+#include "Vulk/VulkDescriptorSet.h"
+#include "Vulk/VulkBufferBuilder.h"
 
 template <typename T>
 class FrameUBOs
@@ -70,6 +72,13 @@ struct MeshResources
           mesh(std::move(mesh)),
           textureView(vk, VULK_TEXTURE_DIR + textureName),
           normalView(vk, VULK_TEXTURE_DIR + normalName) {}
+};
+
+struct Material
+{
+    glm::vec4 diffuse;
+    glm::vec3 fresnelR0;
+    float roughness;
 };
 
 class Resources
@@ -179,118 +188,14 @@ public:
     }
 };
 
-struct DescriptorSetInfo
-{
-    Vulk &vk;
-    VkDescriptorSetLayout descriptorSetLayout;
-    VkDescriptorPool descriptorPool;
-    std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets;
-
-    DescriptorSetInfo(Vulk &vk, VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> &&descriptorSets)
-        : vk(vk),
-          descriptorSetLayout(descriptorSetLayout),
-          descriptorPool(descriptorPool),
-          descriptorSets(std::move(descriptorSets)) {}
-
-    ~DescriptorSetInfo()
-    {
-        vkDestroyDescriptorPool(vk.device, descriptorPool, nullptr);
-        vkDestroyDescriptorSetLayout(vk.device, descriptorSetLayout, nullptr);
-    }
-};
-
-class DescriptorSetInfoBuilder
-{
-    Vulk &vk;
-    VulkDescriptorSetLayoutBuilder layoutBuilder;
-    VulkDescriptorPoolBuilder poolBuilder;
-    struct BufSetUpdaterInfo
-    {
-        VkBuffer buf;
-        VkDeviceSize range;
-    };
-
-    struct PerFrameInfo
-    {
-        std::unordered_map<VulkShaderUBOBindings, BufSetUpdaterInfo> uniformSetInfos;
-        std::unordered_map<VulkShaderSSBOBindings, BufSetUpdaterInfo> ssboSetInfos;
-    };
-    std::array<PerFrameInfo, MAX_FRAMES_IN_FLIGHT> perFrameInfos;
-
-    struct SamplerSetUpdaterInfo
-    {
-        VkImageView imageView;
-        VkSampler sampler;
-    };
-    std::unordered_map<VulkShaderTextureBindings, SamplerSetUpdaterInfo> samplerSetInfos;
-
-public:
-    DescriptorSetInfoBuilder(Vulk &vk) : vk(vk), layoutBuilder(vk), poolBuilder(vk) {}
-
-    template <typename T>
-    DescriptorSetInfoBuilder &addUniformBuffers(std::array<VulkUniformBuffer<T>, MAX_FRAMES_IN_FLIGHT> &uniformBuffers, VkShaderStageFlags stageFlags, VulkShaderUBOBindings bindingID)
-    {
-        layoutBuilder.addUniformBuffer(bindingID, stageFlags);
-        poolBuilder.addUniformBufferCount(MAX_FRAMES_IN_FLIGHT);
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-        {
-            perFrameInfos[i].uniformSetInfos[bindingID] = {uniformBuffers[i].buf, sizeof(T)};
-        }
-        return *this;
-    }
-
-    DescriptorSetInfoBuilder &addImageSampler(VkShaderStageFlags stageFlags, VulkShaderTextureBindings bindingID, VkImageView imageView, VkSampler sampler)
-    {
-        layoutBuilder.addSampler(bindingID, stageFlags);
-        poolBuilder.addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT);
-        samplerSetInfos[bindingID] = {imageView, sampler};
-        return *this;
-    }
-
-    std::unique_ptr<DescriptorSetInfo> build()
-    {
-        VkDescriptorSetLayout descriptorSetLayout = layoutBuilder.build();
-        VkDescriptorPool pool = poolBuilder.build(MAX_FRAMES_IN_FLIGHT);
-        std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets;
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-        {
-            descriptorSets[i] = vk.createDescriptorSet(descriptorSetLayout, pool);
-            VulkDescriptorSetUpdater updater = VulkDescriptorSetUpdater(descriptorSets[i]);
-
-            for (auto &pair : perFrameInfos[i].uniformSetInfos)
-            {
-                updater.addUniformBuffer(pair.second.buf, pair.second.range, pair.first);
-            }
-            for (auto &pair : perFrameInfos[i].ssboSetInfos)
-            {
-                updater.addStorageBuffer(pair.second.buf, pair.second.range, pair.first);
-            }
-            for (auto &pair : samplerSetInfos)
-            {
-                updater.addImageSampler(pair.second.imageView, pair.second.sampler, pair.first);
-            }
-
-            updater.update(vk.device);
-        }
-        return std::make_unique<DescriptorSetInfo>(vk, descriptorSetLayout, pool, std::move(descriptorSets));
-    }
-};
-
-struct Material
-{
-    glm::vec4 diffuse;
-    glm::vec3 fresnelR0;
-    float roughness;
-};
-
 class RenderState
 {
-    std::unique_ptr<DescriptorSetInfo> dsInfo;
+    std::unique_ptr<VulkDescriptorSet> dsInfo;
     std::unique_ptr<VulkPipeline> plInfo;
     Vulk &vk;
 
 public:
-    RenderState(Vulk &vk, std::unique_ptr<DescriptorSetInfo> &&dsInfo, std::unique_ptr<VulkPipeline> &&plInfo)
+    RenderState(Vulk &vk, std::unique_ptr<VulkDescriptorSet> &&dsInfo, std::unique_ptr<VulkPipeline> &&plInfo)
         : vk(vk),
           dsInfo(std::move(dsInfo)),
           plInfo(std::move(plInfo)) {}
@@ -306,37 +211,29 @@ public:
 
 class MeshRenderable
 {
-    Vulk &vk;
     RenderState renderState;
     uint32_t numIndices;
-    VkBuffer vertexBuffer;
-    VkDeviceMemory vertexBufferMemory;
-
-    VkBuffer indexBuffer;
-    VkDeviceMemory indexBufferMemory;
+    VulkBuffer vertBuf, indexBuf;
 
     std::unique_ptr<FrameUBOs<Material>> materials;
 
 public:
-    MeshRenderable(Vulk &vk, VulkMesh const &mesh, std::unique_ptr<FrameUBOs<Material>> materials, std::unique_ptr<DescriptorSetInfo> &&dsInfo, std::unique_ptr<VulkPipeline> &&plInfo)
-        : vk(vk),
-          renderState(vk, std::move(dsInfo), std::move(plInfo)),
+    MeshRenderable(Vulk &vk, VulkMesh const &mesh, std::unique_ptr<FrameUBOs<Material>> materials, std::unique_ptr<VulkDescriptorSet> &&dsInfo, std::unique_ptr<VulkPipeline> &&plInfo)
+        : renderState(vk, std::move(dsInfo), std::move(plInfo)),
           numIndices((uint32_t)mesh.indices.size()),
-          materials(std::move(materials))
-    {
-        auto &vertices = mesh.vertices;
-        auto &indices = mesh.indices;
-        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
-        vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-        bufferSize = sizeof(indices[0]) * indices.size();
-        vk.createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-
-        bufferSize = sizeof(vertices[0]) * vertices.size();
-        vk.copyFromMemToBuffer(vertices.data(), vertexBuffer, bufferSize);
-
-        bufferSize = sizeof(indices[0]) * indices.size();
-        vk.copyFromMemToBuffer(indices.data(), indexBuffer, bufferSize);
-    }
+          vertBuf(VulkBufferBuilder(vk)
+                      .setSize(sizeof(mesh.vertices[0]) * mesh.vertices.size())
+                      .setMem(mesh.vertices.data())
+                      .setUsage(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+                      .setProperties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                      .build()),
+          indexBuf(VulkBufferBuilder(vk)
+                       .setSize(sizeof(mesh.indices[0]) * mesh.indices.size())
+                       .setMem(mesh.indices.data())
+                       .setUsage(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
+                       .setProperties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                       .build()),
+          materials(std::move(materials)) {}
 
     void render(VkCommandBuffer commandBuffer, uint32_t currentFrame, VkViewport const &viewport, VkRect2D const &scissor)
     {
@@ -347,17 +244,9 @@ public:
     void bindAndDrawMesh(VkCommandBuffer commandBuffer)
     {
         VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertBuf.buf, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, indexBuf.buf, 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
-    }
-
-    ~MeshRenderable()
-    {
-        vkDestroyBuffer(vk.device, vertexBuffer, nullptr);
-        vkFreeMemory(vk.device, vertexBufferMemory, nullptr);
-        vkDestroyBuffer(vk.device, indexBuffer, nullptr);
-        vkFreeMemory(vk.device, indexBufferMemory, nullptr);
     }
 };
 
@@ -436,35 +325,35 @@ public:
                                                                                                                  0.8f});
 
         // set up descriptors
-        DescriptorSetInfoBuilder dsBuilder = DescriptorSetInfoBuilder(vk)
+        VulkDescriptorSetBuilder dsBuilder = VulkDescriptorSetBuilder(vk)
                                                  .addUniformBuffers(modelUBOs.xforms.getUBOs(), VK_SHADER_STAGE_VERTEX_BIT, VulkShaderUBOBinding_Xforms)
                                                  .addUniformBuffers(modelUBOs.eyePos.getUBOs(), VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_EyePos)
                                                  .addUniformBuffers(modelUBOs.lights.getUBOs(), VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_Lights);
 
-        std::unique_ptr<DescriptorSetInfo> skullDS = DescriptorSetInfoBuilder(dsBuilder)
+        std::unique_ptr<VulkDescriptorSet> skullDS = VulkDescriptorSetBuilder(dsBuilder)
                                                          .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("skull").textureView.textureImageView, resources.getTextureSampler())
                                                          .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("skull").normalView.textureImageView, resources.getTextureSampler())
                                                          .addUniformBuffers(skullMaterial->getUBOs(), VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_MaterialUBO)
                                                          .build();
-        std::unique_ptr<DescriptorSetInfo> wallDS = DescriptorSetInfoBuilder(dsBuilder)
+        std::unique_ptr<VulkDescriptorSet> wallDS = VulkDescriptorSetBuilder(dsBuilder)
                                                         .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("wall").textureView.textureImageView, resources.getTextureSampler())
                                                         .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("wall").normalView.textureImageView, resources.getTextureSampler())
                                                         .addUniformBuffers(wallMaterial->getUBOs(), VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_MaterialUBO)
                                                         .build();
 
-        std::unique_ptr<DescriptorSetInfo> mirrorDS = DescriptorSetInfoBuilder(dsBuilder)
+        std::unique_ptr<VulkDescriptorSet> mirrorDS = VulkDescriptorSetBuilder(dsBuilder)
                                                           .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("mirror").textureView.textureImageView, resources.getTextureSampler())
                                                           .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("mirror").normalView.textureImageView, resources.getTextureSampler())
                                                           .addUniformBuffers(mirrorMaterial->getUBOs(), VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_MaterialUBO)
                                                           .build();
 
-        std::unique_ptr<DescriptorSetInfo> mirrorStencilDS = DescriptorSetInfoBuilder(dsBuilder)
+        std::unique_ptr<VulkDescriptorSet> mirrorStencilDS = VulkDescriptorSetBuilder(dsBuilder)
                                                                  .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("mirror").textureView.textureImageView, resources.getTextureSampler())
                                                                  .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("mirror").normalView.textureImageView, resources.getTextureSampler())
                                                                  .addUniformBuffers(mirrorMaterial->getUBOs(), VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderUBOBinding_MaterialUBO)
                                                                  .build();
 
-        std::unique_ptr<DescriptorSetInfo> mirrorWorldRenderStateDS = DescriptorSetInfoBuilder(dsBuilder)
+        std::unique_ptr<VulkDescriptorSet> mirrorWorldRenderStateDS = VulkDescriptorSetBuilder(dsBuilder)
                                                                           .addUniformBuffers(mirroredPlanes.getUBOs(), VK_SHADER_STAGE_VERTEX_BIT, VulkShaderUBOBinding_MirrorPlaneUBO)
                                                                           .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_TextureSampler, resources.getMesh("skull").textureView.textureImageView, resources.getTextureSampler())
                                                                           .addImageSampler(VK_SHADER_STAGE_FRAGMENT_BIT, VulkShaderTextureBinding_NormalSampler, resources.getMesh("skull").normalView.textureImageView, resources.getTextureSampler())
