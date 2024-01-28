@@ -18,6 +18,7 @@ Some quick thoughts on my approach: one thing you might notice is that I avoid w
 7. [TexturedScene](/Source/Samples/TexturedScene.h) - blended textures applied to the land and waves scene, with lighting.
 8. [Blending](/Source/Samples/Blending.h)
 9. [Outline With Stencil](/Source/Samples/OutlineWorld.h) - using the stencil buffer to make an outline
+10. [Mirrored Object](/Source/Samples/MirrorWorld.h) - using stencil and transparency for reflection
 
 # Resources
 * [Vulkan Tutorial](https://vulkan-tutorial.com/Introduction)
@@ -46,6 +47,29 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
     * x update the descriptor set
 
 # Log
+
+## 1/28/24 reviewing rendering
+
+Rendering a single thing is pretty straightforward:
+
+![](Assets/Screenshots/rendering_a_skull_diagram.png)
+
+Things get more complicated with reflections where you need to do multiple renders:
+
+![](Assets/Screenshots/mirror_render_diagram.png)
+
+*(simplifying details from the first diagram, assume a 'renderable' means the geometry, textures, descriptor sets, shaders, etc. for rendering the skull)*
+
+One of the things I'm trying to wrap my brain around is cardinality of the renderer for various parts of a render pass:
+1. shaders seem 1:many: multiple pipelines use the LitModel shader for example, however the bindings and inputs have to be the same
+2. models are 1:many with what's rendered if you count instancing data (xform and anything else)
+3. verts/indices/textures are 1:1 (I assume even if you pack multiple models in you still keep this 1:1)
+4. more broadly a set of models rendered the same way are 1:1 with their descriptor set and pipeline.
+
+So:
+* shaders are 1:many with
+* model sets that can pass inputs to them in the same way which are 1:many with
+* the instances you want to render with unique xforms 
 
 ## 1/27/24 reflection rendered too
 ![](Assets/Screenshots/reflected_skull.png)
