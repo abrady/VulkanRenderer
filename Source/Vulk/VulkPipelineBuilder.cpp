@@ -103,6 +103,12 @@ VulkPipelineBuilder &VulkPipelineBuilder::setDepthWriteEnabled(bool enabled)
     return *this;
 }
 
+VulkPipelineBuilder &VulkPipelineBuilder::setDepthCompareOp(VkCompareOp compareOp)
+{
+    depthStencil.depthCompareOp = compareOp;
+    return *this;
+}
+
 VulkPipelineBuilder &VulkPipelineBuilder::addVertexInputBindingDescription(uint32_t binding, uint32_t stride, VkVertexInputRate inputRate)
 {
     bindingDescription.binding = binding;
@@ -208,7 +214,7 @@ VulkPipelineBuilder &VulkPipelineBuilder::setStencilTestEnabled(bool enabled)
     return *this;
 }
 
-VulkPipelineBuilder &VulkPipelineBuilder::setStencilFrontFailOp(VkStencilOp failOp)
+VulkPipelineBuilder &VulkPipelineBuilder::setFrontStencilFailOp(VkStencilOp failOp)
 {
     depthStencil.front.failOp = failOp;
     return *this;
@@ -217,6 +223,12 @@ VulkPipelineBuilder &VulkPipelineBuilder::setStencilFrontFailOp(VkStencilOp fail
 VulkPipelineBuilder &VulkPipelineBuilder::setFrontStencilPassOp(VkStencilOp passOp)
 {
     depthStencil.front.passOp = passOp;
+    return *this;
+}
+
+VulkPipelineBuilder &VulkPipelineBuilder::setFrontStencilDepthFailOp(VkStencilOp depthFailOp)
+{
+    depthStencil.front.depthFailOp = depthFailOp;
     return *this;
 }
 

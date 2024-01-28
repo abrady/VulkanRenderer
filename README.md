@@ -47,7 +47,16 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 1/27/24 reflection rendered too
+![](Assets/Screenshots/reflected_skull.png)
 
+Okay, what did I learn?
+* 
+
+## 1/27/24 mirrored skull rendered!
+![](Assets/Screenshots/mirrored_skull0.png)
+
+fixed the nan and now the mirrored skull is showing up, yay! need to fix the lighting and do the rest of it now
 
 ## 1/27/24 natvis pretty variable debugging
 getting nans in my reflected mesh. glm vecs are a pain in the ass to debug because they have union'd x,y,z with two other things, can I visualize this better?

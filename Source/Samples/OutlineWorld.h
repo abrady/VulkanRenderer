@@ -184,7 +184,7 @@ public:
             .addFragmentShaderStageDeprecated("Source/Shaders/Frag/LitModel.spv")
             .addVulkVertexInput(0)
             .setStencilTestEnabled(true)
-            .setStencilFrontFailOp(VK_STENCIL_OP_KEEP)      // keep the stencil buffer unchanged
+            .setFrontStencilFailOp(VK_STENCIL_OP_KEEP)      // keep the stencil buffer unchanged
             .setFrontStencilPassOp(VK_STENCIL_OP_REPLACE)   // replace the stencil buffer with the reference value
             .setFrontStencilCompareOp(VK_COMPARE_OP_ALWAYS) // always pass the stencil test for our first pass
             .setFrontStencilCompareMask(0xFF)               // compare against all bits
@@ -257,7 +257,7 @@ public:
             .setDepthTestEnabled(false)
             .setDepthWriteEnabled(false)
             .setStencilTestEnabled(true)
-            .setStencilFrontFailOp(VK_STENCIL_OP_KEEP)         // keep the stencil buffer unchanged
+            .setFrontStencilFailOp(VK_STENCIL_OP_KEEP)         // keep the stencil buffer unchanged
             .setFrontStencilPassOp(VK_STENCIL_OP_KEEP)         // keep the stencil buffer unchanged
             .setFrontStencilCompareOp(VK_COMPARE_OP_NOT_EQUAL) // only modify where the model did not draw
             .setFrontStencilCompareMask(0xFF)                  // compare against all bits

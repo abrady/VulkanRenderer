@@ -72,6 +72,7 @@ enum VulkShaderBindings
     VulkShaderBinding_NormalSampler = 9,
     VulkShaderBinding_ModelXform = 10,
     VulkShaderBinding_MirrorPlaneUBO = 11,
+    VulkShaderBinding_MaterialUBO = 12,
     VulkShaderBinding_MaxBindingID,
 };
 
@@ -83,6 +84,7 @@ enum VulkShaderUBOBindings
     VulkShaderUBOBinding_WavesXform = VulkShaderBinding_WavesXform,
     VulkShaderUBOBinding_ModelXform = VulkShaderBinding_ModelXform,
     VulkShaderUBOBinding_MirrorPlaneUBO = VulkShaderBinding_MirrorPlaneUBO,
+    VulkShaderUBOBinding_MaterialUBO = VulkShaderBinding_MaterialUBO,
     VulkShaderUBOBinding_MaxBindingID,
 };
 

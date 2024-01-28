@@ -82,9 +82,11 @@ public:
     VulkPipelineBuilder &setCullMode(VkCullModeFlags cullMode);
     VulkPipelineBuilder &setDepthTestEnabled(bool enabled);
     VulkPipelineBuilder &setDepthWriteEnabled(bool enabled);
+    VulkPipelineBuilder &setDepthCompareOp(VkCompareOp compareOp);
     VulkPipelineBuilder &setStencilTestEnabled(bool enabled);
-    VulkPipelineBuilder &setStencilFrontFailOp(VkStencilOp failOp);
+    VulkPipelineBuilder &setFrontStencilFailOp(VkStencilOp failOp);
     VulkPipelineBuilder &setFrontStencilPassOp(VkStencilOp passOp);
+    VulkPipelineBuilder &setFrontStencilDepthFailOp(VkStencilOp depthFailOp);
     VulkPipelineBuilder &setFrontStencilCompareOp(VkCompareOp compareOp);
     VulkPipelineBuilder &setFrontStencilCompareMask(uint32_t compareMask);
     VulkPipelineBuilder &setFrontStencilWriteMask(uint32_t writeMask);
