@@ -12,7 +12,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/hash.hpp>
 #include <glm/gtx/euler_angles.hpp>
-#include <stb_image.h>
+#include <stb/stb_image.h>
 #include <tiny_obj_loader.h>
 
 #pragma warning(pop)
@@ -113,6 +113,14 @@ struct VulkLight
     float falloffEnd;    // point/spot light only
     glm::vec3 direction; // directional/spot light only
     float spotPower;     // spotlight only
+};
+
+// keep in sync with Source\Shaders\Common\common.glsl
+struct VulkMaterial
+{
+    glm::vec4 diffuse;
+    glm::vec3 fresnelR0;
+    float roughness;
 };
 
 struct QueueFamilyIndices

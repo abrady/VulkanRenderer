@@ -22,10 +22,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(VULKAN_UTILS "c:\\Vulkan")
 # Use the variable in the include_directories command
 include_directories("${VULKAN_UTILS}\\glfw\\include")
-include_directories("${VULKAN_UTILS}\\glm")
-include_directories("${VULKAN_UTILS}\\stb")
-include_directories("${VULKAN_UTILS}\\tinyobjloader")
 
+include_directories("${CMAKE_SOURCE_DIR}/Source/ThirdParty/include")
 include_directories("$ENV{VK_SDK_PATH}/include")
 add_compile_options(-W3)
 
@@ -189,6 +187,7 @@ set(VULKAN_RENDERER_SOURCES
     "Source/Vulk/VulkDescriptorSetLayoutBuilder.cpp"
     "Source/Vulk/VulkDescriptorSetUpdater.cpp"
     "Source/Vulk/VulkPipelineBuilder.cpp"
+    "Source/Vulk/VulkResources.cpp"
     "Source/Vulk/VulkTextureView.cpp"
 )
 

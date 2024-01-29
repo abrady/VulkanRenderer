@@ -48,6 +48,9 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
+## 1/28/24 shadows
+How do you render shadows?
+
 ## 1/28/24 reviewing rendering
 
 Rendering a single thing is pretty straightforward:

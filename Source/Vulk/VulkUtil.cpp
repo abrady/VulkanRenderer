@@ -9,7 +9,7 @@
 #pragma warning(push, 0)        // assume these headers know what they're doing
 #pragma warning(disable : 6262) // warning C6262: Function uses '35036' bytes of stack:  exceeds /analyze:stacksize '16384'
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include <stb/stb_image.h>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
