@@ -48,8 +48,16 @@ Install the following. Note that CmakeLists.txt assumes these are in C:\Vulkan:
 
 # Log
 
-## 1/28/24 shadows
-How do you render shadows?
+## 1/31/24 Resources, RAII, and the rule of 3/5/0
+C++ is a beautiful terrible language, and if you want to you can do just about anything. The problem arises when you do anything, you can make the
+code a lot harder to understand, and make it easy to forget to do things in some cases that leads to very hard to track down bugs.
+
+Take a resource, say, a VkPipeline instance: it's great to write a class VulkPipeline that is constructed with a VkPipeline, and cleans it up on destruction. The problem is that if you inadvertantly
+make a temporary VulkPipeline, you'll free the VkPipeline handle after you've copied it off, and that's no good.
+
+C++ says: follow the rule of 5 (formerly 3): https://en.cppreference.com/w/cpp/language/rule_of_three - just define a move ctor and assignment operator, delete the copy ctor and assignment operator, and you're good.
+
+I says: what a pain in the ass. instead, why don't we use smart pointers (unique_ptrs for now) for all of our resources, and just delete all the ctors and assignment operators so we don't have to worry about this.
 
 ## 1/28/24 reviewing rendering
 

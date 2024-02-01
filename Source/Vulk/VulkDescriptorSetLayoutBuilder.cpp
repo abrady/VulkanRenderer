@@ -2,7 +2,13 @@
 #include "VulkUtil.h"
 #include "Vulk.h"
 
-VulkDescriptorSetLayoutBuilder &VulkDescriptorSetLayoutBuilder::addUniformBuffer(uint32_t binding, VkShaderStageFlags stageFlags)
+VulkDescriptorSetLayout::VulkDescriptorSetLayout(Vulk &vk, VkDescriptorSetLayout layout) : vk(vk), layout(layout) {}
+VulkDescriptorSetLayout::~VulkDescriptorSetLayout()
+{
+    vkDestroyDescriptorSetLayout(vk.device, layout, nullptr);
+}
+
+VulkDescriptorSetLayoutBuilder &VulkDescriptorSetLayoutBuilder::addUniformBuffer(VkShaderStageFlags stageFlags, VulkShaderUBOBindings binding)
 {
     VkDescriptorSetLayoutBinding layoutBinding{};
     layoutBinding.binding = binding;
@@ -14,7 +20,7 @@ VulkDescriptorSetLayoutBuilder &VulkDescriptorSetLayoutBuilder::addUniformBuffer
     return *this;
 }
 
-VulkDescriptorSetLayoutBuilder &VulkDescriptorSetLayoutBuilder::addSampler(uint32_t binding, VkShaderStageFlags stageFlags)
+VulkDescriptorSetLayoutBuilder &VulkDescriptorSetLayoutBuilder::addImageSampler(VkShaderStageFlags stageFlags, VulkShaderTextureBindings binding)
 {
     VkDescriptorSetLayoutBinding layoutBinding{};
     layoutBinding.binding = binding;
@@ -26,7 +32,7 @@ VulkDescriptorSetLayoutBuilder &VulkDescriptorSetLayoutBuilder::addSampler(uint3
     return *this;
 }
 
-VulkDescriptorSetLayoutBuilder &VulkDescriptorSetLayoutBuilder::addStorageBuffer(uint32_t binding, VkShaderStageFlags stageFlags)
+VulkDescriptorSetLayoutBuilder &VulkDescriptorSetLayoutBuilder::addStorageBuffer(VkShaderStageFlags stageFlags, VulkShaderSSBOBindings binding)
 {
     VkDescriptorSetLayoutBinding layoutBinding{};
     layoutBinding.binding = binding;
@@ -38,7 +44,7 @@ VulkDescriptorSetLayoutBuilder &VulkDescriptorSetLayoutBuilder::addStorageBuffer
     return *this;
 }
 
-VkDescriptorSetLayout VulkDescriptorSetLayoutBuilder::build()
+std::unique_ptr<VulkDescriptorSetLayout> VulkDescriptorSetLayoutBuilder::build()
 {
     std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
     layoutBindings.reserve(layoutBindingsMap.size());
@@ -53,5 +59,5 @@ VkDescriptorSetLayout VulkDescriptorSetLayoutBuilder::build()
 
     VkDescriptorSetLayout descriptorSetLayout;
     VK_CALL(vkCreateDescriptorSetLayout(vk.device, &layoutCreateInfo, nullptr, &descriptorSetLayout));
-    return descriptorSetLayout;
+    return std::make_unique<VulkDescriptorSetLayout>(vk, descriptorSetLayout);
 }

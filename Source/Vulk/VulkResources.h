@@ -8,27 +8,79 @@
 #include "Vulk.h"
 #include "VulkTextureView.h"
 #include "VulkMesh.h"
+#include "VulkDescriptorSetLayoutBuilder.h"
+#include "VulkFrameUBOs.h"
+#include "VulkBufferBuilder.h"
+#include "VulkDescriptorSetBuilder.h"
+#include "VulkPipelineBuilder.h"
 
+struct VulkMeshResources
+{
+    Vulk &vk;
+    VulkMesh mesh;
+    VulkTextureView textureView;
+    VulkTextureView normalView;
+    uint32_t numIndices;
+    VulkBuffer vertBuf, indexBuf;
+    VulkFrameUBOs<VulkMaterial> materialUBOs;
+    std::unique_ptr<VulkDescriptorSetInfo> dsInfo;
+
+    VulkMeshResources(Vulk &vk, VulkMesh &&meshIn, std::filesystem::path const &texturePath, std::filesystem::path const &normalPath, VulkMaterial material)
+        : vk(vk),
+          mesh(std::move(meshIn)),
+          textureView(vk, texturePath),
+          normalView(vk, normalPath),
+          numIndices((uint32_t)mesh.indices.size()),
+          vertBuf(VulkBufferBuilder(vk)
+                      .setSize(sizeof(mesh.vertices[0]) * mesh.vertices.size())
+                      .setMem(mesh.vertices.data())
+                      .setUsage(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+                      .setProperties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                      .build()),
+          indexBuf(VulkBufferBuilder(vk)
+                       .setSize(sizeof(mesh.indices[0]) * mesh.indices.size())
+                       .setMem(mesh.indices.data())
+                       .setUsage(VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
+                       .setProperties(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                       .build()),
+          materialUBOs(vk, material) {}
+
+    void setDescriptorSets(std::unique_ptr<VulkDescriptorSetInfo> dsi)
+    {
+        this->dsInfo = std::move(dsi);
+    }
+};
+
+// load resources used for rendering a set of things: shaders, meshes, textures, materials, etc.
+// Note:
+//  not thread safe,
+//  not currently using reference counting so materials load twice
 class VulkResources
 {
 public:
-    struct MeshResources
-    {
-        Vulk &vk;
-        VulkMesh mesh;
-        VulkTextureView textureView;
-        VulkTextureView normalView;
+    Vulk &vk;
 
-        MeshResources(Vulk &vk, VulkMesh &&mesh, std::string const &textureName, std::string const &normalName)
-            : vk(vk),
-              mesh(std::move(mesh)),
-              textureView(vk, VULK_TEXTURE_DIR + textureName),
-              normalView(vk, VULK_TEXTURE_DIR + normalName) {}
+    struct XformsUBO
+    {
+        alignas(16) glm::mat4 world;
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 proj;
     };
 
+    struct ModelUBOs
+    {
+        VulkFrameUBOs<XformsUBO> xforms;
+        VulkFrameUBOs<glm::vec3> eyePos;
+        VulkFrameUBOs<VulkLight> lights;
+        ModelUBOs(Vulk &vk) : xforms(vk), eyePos(vk), lights(vk) {}
+    };
+    ModelUBOs modelUBOs;
+
 private:
-    Vulk &vk;
-    std::unordered_map<std::string, std::unique_ptr<MeshResources>> meshResources;
+    std::unordered_map<std::string, std::unique_ptr<VulkFrameUBOs<VulkMaterial>>> materials;
+    std::unordered_map<std::string, std::unique_ptr<VulkDescriptorSetLayout>> descriptorSetLayouts;
+    std::unordered_map<std::string, std::unique_ptr<VulkPipeline>> pipelines;
+    std::unordered_map<std::string, std::unique_ptr<VulkMeshResources>> meshResources;
     std::unordered_map<std::string, VkShaderModule> vertShaders, fragShaders;
     VkSampler textureSampler;
 
@@ -38,98 +90,33 @@ private:
         Fragment
     };
 
-    VkShaderModule createShaderModule(ShaderType type, std::string const &name)
-    {
-        std::string subdir;
-        switch (type)
-        {
-        case Vertex:
-            subdir = "Vert";
-            break;
-        case Fragment:
-            subdir = "Frag";
-            break;
-        };
+    VkShaderModule createShaderModule(ShaderType type, std::string const &name);
+    void loadMetadata();
 
-        std::string path = VULK_SHADERS_DIR + subdir + "/" + name + ".spv";
-        auto shaderCode = readFileIntoMem(path);
-        VkShaderModule shaderModule = vk.createShaderModule(shaderCode);
-        return shaderModule;
-    }
-
-    void loadResources(std::string build_dir);
+    VulkResources &addMesh(std::string const &name, std::unique_ptr<VulkMeshResources> &&mesh);
+    void loadDescriptorSetLayouts();
+    void loadPipelines();
 
 public:
     VulkResources(Vulk &vk)
-        : vk(vk)
+        : vk(vk), modelUBOs(vk)
     {
+        loadMetadata();
         textureSampler = vk.createTextureSampler();
+        loadDescriptorSetLayouts();
+        loadPipelines();
     }
 
-    VulkResources &addMesh(std::string const &name, std::unique_ptr<MeshResources> &&mesh)
-    {
-        ASSERT_KEY_NOT_SET(meshResources, name);
-        meshResources[name] = std::move(mesh);
-        return *this;
-    }
+    VulkResources &loadActor(std::string name); // load from the metadata for rendering
+    VulkResources &loadVertexShader(std::string name);
+    VulkResources &loadFragmentShader(std::string name);
 
-    VulkResources &loadVertexShader(std::string name)
-    {
-        ASSERT_KEY_NOT_SET(vertShaders, name);
-        VkShaderModule shaderModule = createShaderModule(Vertex, name);
-        vertShaders[name] = shaderModule;
-        return *this;
-    }
+    VkShaderModule getVertexShader(std::string const &name);
+    VkShaderModule getFragmentShader(std::string const &name);
+    VkSampler getTextureSampler();
+    VulkMeshResources const *getMesh(std::string const &name);
+    VkPipeline getPipeline(std::string const &name);
+    VkPipelineLayout getPipelineLayout(std::string const &name);
 
-    VulkResources &loadFragmentShader(std::string name)
-    {
-        ASSERT_KEY_NOT_SET(fragShaders, name);
-        VkShaderModule shaderModule = createShaderModule(Fragment, name);
-        fragShaders[name] = shaderModule;
-        return *this;
-    }
-
-    VkShaderModule getVertexShader(std::string const &name)
-    {
-        if (vertShaders.find(name) == vertShaders.end())
-        {
-            loadVertexShader(name);
-        }
-        ASSERT_KEY_SET(vertShaders, name);
-        return vertShaders[name];
-    }
-
-    VkShaderModule getFragmentShader(std::string const &name)
-    {
-        if (fragShaders.find(name) == fragShaders.end())
-        {
-            loadFragmentShader(name);
-        }
-        ASSERT_KEY_SET(fragShaders, name);
-        return fragShaders[name];
-    }
-
-    MeshResources &getMesh(std::string const &name)
-    {
-        ASSERT_KEY_SET(meshResources, name);
-        return *meshResources[name];
-    }
-
-    VkSampler getTextureSampler()
-    {
-        return textureSampler;
-    }
-
-    ~VulkResources()
-    {
-        for (auto &pair : vertShaders)
-        {
-            vkDestroyShaderModule(vk.device, pair.second, nullptr);
-        }
-        for (auto &pair : fragShaders)
-        {
-            vkDestroyShaderModule(vk.device, pair.second, nullptr);
-        }
-        vkDestroySampler(vk.device, textureSampler, nullptr);
-    }
+    ~VulkResources();
 };

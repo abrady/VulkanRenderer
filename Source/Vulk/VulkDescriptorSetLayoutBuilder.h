@@ -1,9 +1,18 @@
 #pragma once
-#include <vector>
-#include <vulkan/vulkan.h>
-#include <unordered_map>
 
+#include "VulkUtil.h"
+#include "Common/ClassNonCopyableNonMovable.h"
 class Vulk;
+
+class VulkDescriptorSetLayout : public ClassNonCopyableNonMovable
+{
+    Vulk &vk;
+
+public:
+    VkDescriptorSetLayout layout;
+    VulkDescriptorSetLayout(Vulk &vk, VkDescriptorSetLayout layout);
+    ~VulkDescriptorSetLayout();
+};
 
 class VulkDescriptorSetLayoutBuilder
 {
@@ -11,12 +20,13 @@ class VulkDescriptorSetLayoutBuilder
 
 public:
     VulkDescriptorSetLayoutBuilder(Vulk &vk) : vk(vk) {}
-    VulkDescriptorSetLayoutBuilder &addUniformBuffer(uint32_t binding, VkShaderStageFlags stageFlags);
-    VulkDescriptorSetLayoutBuilder &addSampler(uint32_t binding, VkShaderStageFlags stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT);
-    VulkDescriptorSetLayoutBuilder &addStorageBuffer(uint32_t binding, VkShaderStageFlags stageFlags);
+    void foo() {}
+    VulkDescriptorSetLayoutBuilder &addUniformBuffer(VkShaderStageFlags stageFlags, VulkShaderUBOBindings binding);
+    VulkDescriptorSetLayoutBuilder &addImageSampler(VkShaderStageFlags stageFlags, VulkShaderTextureBindings binding);
+    VulkDescriptorSetLayoutBuilder &addStorageBuffer(VkShaderStageFlags stageFlags, VulkShaderSSBOBindings binding);
 
     // and finally, build the layout
-    VkDescriptorSetLayout build();
+    std::unique_ptr<VulkDescriptorSetLayout> build();
 
 private:
     std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> layoutBindingsMap;

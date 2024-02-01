@@ -73,6 +73,12 @@
         "xmemory": "cpp",
         "xtr1common": "cpp",
         "mutex": "cpp",
-        "xstddef": "cpp"
+        "xstddef": "cpp",
+        "ranges": "cpp",
+        "span": "cpp",
+        "any": "cpp",
+        "filesystem": "cpp",
+        "numeric": "cpp",
+        "valarray": "cpp"
     }
 }

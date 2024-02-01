@@ -1,21 +1,27 @@
 #pragma once
 
+#include "VulkUtil.h"
 #include "Vulk.h"
+#include "VulkDescriptorPoolBuilder.h"
+#include "VulkUniformBuffer.h"
+#include "VulkDescriptorSetLayoutBuilder.h"
+#include "VulkDescriptorSetUpdater.h"
+#include "Common/ClassNonCopyableNonMovable.h"
 
-struct VulkDescriptorSet
+struct VulkDescriptorSetInfo : public ClassNonCopyableNonMovable
 {
     Vulk &vk;
     VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorPool descriptorPool;
     std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets;
 
-    VulkDescriptorSet(Vulk &vk, VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> &&descriptorSets)
+    VulkDescriptorSetInfo(Vulk &vk, VkDescriptorSetLayout descriptorSetLayout, VkDescriptorPool descriptorPool, std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> &&descriptorSets)
         : vk(vk),
           descriptorSetLayout(descriptorSetLayout),
           descriptorPool(descriptorPool),
           descriptorSets(std::move(descriptorSets)) {}
 
-    ~VulkDescriptorSet()
+    ~VulkDescriptorSetInfo()
     {
         vkDestroyDescriptorPool(vk.device, descriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(vk.device, descriptorSetLayout, nullptr);
@@ -53,7 +59,7 @@ public:
     template <typename T>
     VulkDescriptorSetBuilder &addUniformBuffers(std::array<VulkUniformBuffer<T>, MAX_FRAMES_IN_FLIGHT> &uniformBuffers, VkShaderStageFlags stageFlags, VulkShaderUBOBindings bindingID)
     {
-        layoutBuilder.addUniformBuffer(bindingID, stageFlags);
+        layoutBuilder.addUniformBuffer(stageFlags, bindingID);
         poolBuilder.addUniformBufferCount(MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -64,20 +70,20 @@ public:
 
     VulkDescriptorSetBuilder &addImageSampler(VkShaderStageFlags stageFlags, VulkShaderTextureBindings bindingID, VkImageView imageView, VkSampler sampler)
     {
-        layoutBuilder.addSampler(bindingID, stageFlags);
+        layoutBuilder.addImageSampler(stageFlags, bindingID);
         poolBuilder.addCombinedImageSamplerCount(MAX_FRAMES_IN_FLIGHT);
         samplerSetInfos[bindingID] = {imageView, sampler};
         return *this;
     }
 
-    std::unique_ptr<VulkDescriptorSet> build()
+    std::unique_ptr<VulkDescriptorSetInfo> build()
     {
-        VkDescriptorSetLayout descriptorSetLayout = layoutBuilder.build();
+        std::unique_ptr<VulkDescriptorSetLayout> descriptorSetLayout = layoutBuilder.build();
         VkDescriptorPool pool = poolBuilder.build(MAX_FRAMES_IN_FLIGHT);
         std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            descriptorSets[i] = vk.createDescriptorSet(descriptorSetLayout, pool);
+            descriptorSets[i] = vk.createDescriptorSet(descriptorSetLayout->layout, pool);
             VulkDescriptorSetUpdater updater = VulkDescriptorSetUpdater(descriptorSets[i]);
 
             for (auto &pair : perFrameInfos[i].uniformSetInfos)
@@ -95,6 +101,9 @@ public:
 
             updater.update(vk.device);
         }
-        return std::make_unique<VulkDescriptorSet>(vk, descriptorSetLayout, pool, std::move(descriptorSets));
+        // crappy ownership pass.
+        VkDescriptorSetLayout layout = descriptorSetLayout->layout;
+        descriptorSetLayout->layout = VK_NULL_HANDLE;
+        return std::make_unique<VulkDescriptorSetInfo>(vk, layout, pool, std::move(descriptorSets));
     }
 };

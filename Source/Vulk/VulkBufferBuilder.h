@@ -39,6 +39,7 @@ public:
     VulkBufferBuilder &setSize(VkDeviceSize sizeIn)
     {
         assert(size == 0);
+        assert(sizeIn > 0);
         this->size = sizeIn;
         return *this;
     }

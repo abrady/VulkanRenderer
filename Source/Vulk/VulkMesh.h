@@ -2,14 +2,16 @@
 
 #include "Vulk.h"
 
-struct VulkMeshRef {
-        char const *name = nullptr;
-        uint32_t firstVertex = 0;
-        uint32_t firstIndex = 0;
-        uint32_t indexCount = 0;
+struct VulkMeshRef
+{
+    char const *name = nullptr;
+    uint32_t firstVertex = 0;
+    uint32_t firstIndex = 0;
+    uint32_t indexCount = 0;
 };
 
-class VulkMesh {
+class VulkMesh
+{
 public:
     char const *name = nullptr;
     std::vector<Vertex> vertices;
@@ -20,4 +22,5 @@ public:
     void xform(glm::mat4 const &xform);
 
     static VulkMesh loadFromFile(char const *filename);
+    static VulkMesh loadFromPath(std::filesystem::path const &path) { return loadFromFile(path.string().c_str()); }
 };

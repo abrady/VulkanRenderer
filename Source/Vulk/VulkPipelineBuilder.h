@@ -1,8 +1,9 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
+#include "Common/ClassNonCopyableNonMovable.h"
 
-struct VulkPipeline
+struct VulkPipeline : public ClassNonCopyableNonMovable
 {
     Vulk &vk;
     VkPipeline pipeline;

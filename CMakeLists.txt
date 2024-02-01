@@ -23,6 +23,7 @@ set(VULKAN_UTILS "c:\\Vulkan")
 # Use the variable in the include_directories command
 include_directories("${VULKAN_UTILS}\\glfw\\include")
 
+include_directories("${CMAKE_SOURCE_DIR}/Source")
 include_directories("${CMAKE_SOURCE_DIR}/Source/ThirdParty/include")
 include_directories("$ENV{VK_SDK_PATH}/include")
 add_compile_options(-W3)
