@@ -6,7 +6,7 @@ I'm basically following Introduction to 3D Game Programming with DirectX 12 by F
 
 Some quick thoughts on my approach: one thing you might notice is that I avoid wrapping a lot of the vulkan boilerplate in functions and structs for many of the samples. this makes for verbose code that can seem harder to understand at first glance, however, in my experience, premature abstractions both end up making code more confusing by hiding what is actually going on (i.e. what assumptions the abstraction made) and undermine the goal of code like this which is to understand how Vulkan works. I'm writing this note after six days of effort and my biggest regrets so far have all been premature encapsulation and the subsequent ex-capsulation. 
 
-...
+Note: Part 2 of this exists here: https://github.com/abrady/Vulk - keeping the samples running while writing new features was getting cumbersome. If you're interested in more advanced topics, check that out.
 
 # Samples
 1. [Viking Room](/Source/Samples/VikingRoom.h) - loads a model and renders it
